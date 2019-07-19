@@ -1,3 +1,9 @@
+
+# coding: utf-8
+
+# In[5]:
+
+
 from pathlib import Path
 from typing import Callable, List
 
@@ -7,12 +13,15 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 
-from .transforms import tensor_transform
-from .utils import ON_KAGGLE
+from transforms import tensor_transform
+from utils import ON_KAGGLE
+
+
+# In[ ]:
 
 
 N_CLASSES = 1103
-DATA_ROOT = Path('../input/imet-2019-fgvc6' if ON_KAGGLE else './data')
+DATA_ROOT = Path('../input/aptos2019-blindness-detection' if ON_KAGGLE else './data')
 
 
 class TrainDataset(Dataset):
@@ -71,3 +80,4 @@ def load_image(item, root: Path) -> Image.Image:
 
 def get_ids(root: Path) -> List[str]:
     return sorted({p.name.split('_')[0] for p in root.glob('*.png')})
+

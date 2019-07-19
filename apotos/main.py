@@ -1,3 +1,9 @@
+
+# coding: utf-8
+
+# In[1]:
+
+
 import argparse
 from itertools import islice
 import json
@@ -15,12 +21,15 @@ from torch import nn, cuda
 from torch.optim import Adam
 import tqdm
 
-from . import models
-from .dataset import TrainDataset, TTADataset, get_ids, N_CLASSES, DATA_ROOT
-from .transforms import train_transform, test_transform
-from .utils import (
+import models
+from dataset import TrainDataset, TTADataset, get_ids, N_CLASSES, DATA_ROOT
+from transforms import train_transform, test_transform
+from utils import (
     write_event, load_model, mean_df, ThreadingDataLoader as DataLoader,
     ON_KAGGLE)
+
+
+# In[ ]:
 
 
 def main():
@@ -48,6 +57,7 @@ def main():
     run_root = Path(args.run_root)
     folds = pd.read_csv('folds.csv')
     train_root = DATA_ROOT / ('train_sample' if args.use_sample else 'train')
+    
     if args.use_sample:
         folds = folds[folds['Id'].isin(set(get_ids(train_root)))]
     train_fold = folds[folds['fold'] != args.fold]
@@ -309,5 +319,9 @@ def _reduce_loss(loss):
     return loss.sum() / loss.shape[0]
 
 
+# In[ ]:
+
+
 if __name__ == '__main__':
     main()
+

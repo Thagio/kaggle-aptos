@@ -1,3 +1,9 @@
+
+# coding: utf-8
+
+# In[ ]:
+
+
 from functools import partial
 
 import torch
@@ -5,7 +11,7 @@ from torch import nn
 from torch.nn import functional as F
 import torchvision.models as M
 
-from .utils import ON_KAGGLE
+from utils import ON_KAGGLE
 
 
 class AvgPool(nn.Module):
@@ -75,3 +81,4 @@ densenet121 = partial(DenseNet, net_cls=M.densenet121)
 densenet169 = partial(DenseNet, net_cls=M.densenet169)
 densenet201 = partial(DenseNet, net_cls=M.densenet201)
 densenet161 = partial(DenseNet, net_cls=M.densenet161)
+

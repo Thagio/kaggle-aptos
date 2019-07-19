@@ -1,3 +1,9 @@
+
+# coding: utf-8
+
+# In[ ]:
+
+
 import argparse
 
 import pandas as pd
@@ -5,6 +11,9 @@ import pandas as pd
 from .utils import mean_df
 from .dataset import DATA_ROOT
 from .main import binarize_prediction
+
+
+# In[ ]:
 
 
 def main():
@@ -35,3 +44,4 @@ def get_classes(item):
 
 if __name__ == '__main__':
     main()
+

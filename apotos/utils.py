@@ -1,3 +1,9 @@
+
+# coding: utf-8
+
+# In[3]:
+
+
 from datetime import datetime
 import json
 import glob
@@ -14,8 +20,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 
-ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
-
+#ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
+ON_KAGGLE = True
 
 def gmean_df(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby(level=0).agg(lambda x: gmean(list(x)))
@@ -160,3 +166,4 @@ def plot(*args, ymin=None, ymax=None, xmin=None, xmax=None, params=False,
 def _smooth(ys, indices):
     return [np.mean(ys[idx: indices[i + 1]])
             for i, idx in enumerate(indices[:-1])]
+

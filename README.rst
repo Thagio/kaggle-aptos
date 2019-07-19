@@ -1,6 +1,6 @@
-iMet Collection 2019 - FGVC6
+APTOS 2019 Blindness Detection
 ============================
 
-This is PyTorch baseline for https://www.kaggle.com/c/imet-2019-fgvc6/
+This is PyTorch baseline for https://www.kaggle.com/c/aptos2019-blindness-detection
 
 License is MIT.
