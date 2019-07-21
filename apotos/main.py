@@ -29,14 +29,33 @@ from utils import (
     ON_KAGGLE)
 
 
-# In[ ]:
+# In[2]:
+
+
+# FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
+def is_env_notebook():
+    """Determine wheather is the environment Jupyter Notebook"""
+    if 'get_ipython' not in globals():
+        # Python shell
+        return False
+    env_name = get_ipython().__class__.__name__
+    if env_name == 'TerminalInteractiveShell':
+        # IPython shell
+        return False
+    # Jupyter Notebook
+    return True
+
+
+# In[5]:
 
 
 def main():
+    
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
-    arg('mode', choices=['train', 'validate', 'predict_valid', 'predict_test'])
-    arg('run_root')
+    
+    arg('--mode', choices=['train', 'validate', 'predict_valid', 'predict_test'])
+    arg('--run_root')
     arg('--model', default='resnet50')
     arg('--pretrained', type=int, default=1)
     arg('--batch-size', type=int, default=64)
@@ -52,11 +71,21 @@ def main():
     arg('--debug', action='store_true')
     arg('--limit', type=int)
     arg('--fold', type=int, default=0)
-    args = parser.parse_args()
+  
+  #  from IPython.core.debugger import Pdb; Pdb().set_trace()
+    if is_env_notebook():
+        # jupyter-notebookの場合、ここで引数を選択しないといけない。
+        arg_list = ["--mode","train",
+                   "--run_root","model_1"]
+        args = parser.parse_args(args=arg_list)
+    else:
+        args = parser.parse_args()
 
+ #   from IPython.core.debugger import Pdb; Pdb().set_trace()
     run_root = Path(args.run_root)
     folds = pd.read_csv('folds.csv')
-    train_root = DATA_ROOT / ('train_sample' if args.use_sample else 'train')
+    
+    train_root = DATA_ROOT / ('train_sample' if args.use_sample else 'train_images')
     
     if args.use_sample:
         folds = folds[folds['Id'].isin(set(get_ids(train_root)))]
@@ -104,7 +133,7 @@ def main():
             init_optimizer=lambda params, lr: Adam(params, lr),
             use_cuda=use_cuda,
         )
-
+     #   from IPython.core.debugger import Pdb; Pdb().set_trace()
         if args.pretrained:
             if train(params=fresh_params, n_epochs=1, **train_kwargs):
                 train(params=all_params, **train_kwargs)
@@ -131,7 +160,7 @@ def main():
                     **predict_kwargs)
         elif args.mode == 'predict_test':
             test_root = DATA_ROOT / (
-                'test_sample' if args.use_sample else 'test')
+                'test_sample' if args.use_sample else 'test_images')
             ss = pd.read_csv(DATA_ROOT / 'sample_submission.csv')
             if args.use_sample:
                 ss = ss[ss['id'].isin(set(get_ids(test_root)))]
@@ -171,6 +200,7 @@ def predict(model, root: Path, df: pd.DataFrame, out_path: Path,
 def train(args, model: nn.Module, criterion, *, params,
           train_loader, valid_loader, init_optimizer, use_cuda,
           n_epochs=None, patience=2, max_lr_changes=2) -> bool:
+    
     lr = args.lr
     n_epochs = n_epochs or args.n_epochs
     params = list(params)
@@ -179,11 +209,13 @@ def train(args, model: nn.Module, criterion, *, params,
     run_root = Path(args.run_root)
     model_path = run_root / 'model.pt'
     best_model_path = run_root / 'best-model.pt'
+    
     if model_path.exists():
         state = load_model(model, model_path)
         epoch = state['epoch']
         step = state['step']
         best_valid_loss = state['best_valid_loss']
+        
     else:
         epoch = 1
         step = 0
@@ -208,8 +240,10 @@ def train(args, model: nn.Module, criterion, *, params,
         tq.set_description(f'Epoch {epoch}, lr {lr}')
         losses = []
         tl = train_loader
+     #   from IPython.core.debugger import Pdb; Pdb().set_trace()
         if args.epoch_size:
             tl = islice(tl, args.epoch_size // args.batch_size)
+            
         try:
             mean_loss = 0
             for i, (inputs, targets) in enumerate(tl):
@@ -236,6 +270,9 @@ def train(args, model: nn.Module, criterion, *, params,
             write_event(log, step, **valid_metrics)
             valid_loss = valid_metrics['valid_loss']
             valid_losses.append(valid_loss)
+            
+        #    from IPython.core.debugger import Pdb; Pdb().set_trace()
+            
             if valid_loss < best_valid_loss:
                 best_valid_loss = valid_loss
                 shutil.copy(str(model_path), str(best_model_path))
@@ -319,9 +356,10 @@ def _reduce_loss(loss):
     return loss.sum() / loss.shape[0]
 
 
-# In[ ]:
+# In[6]:
 
 
 if __name__ == '__main__':
     main()
+    #print(N_CLASSES)
 

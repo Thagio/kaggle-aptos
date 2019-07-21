@@ -35,7 +35,7 @@ def is_env_notebook():
     return True
 
 
-# In[28]:
+# In[6]:
 
 
 # make_foldsはマルチラベル用になってる。
@@ -78,13 +78,13 @@ def make_folds(n_folds:int) -> pd.DataFrame:
         #for cls in item.diagnosis:
         fold_cls_counts[fold, cls] += 1
         
-     #   from IPython.core.debugger import Pdb; Pdb().set_trace()
+    from IPython.core.debugger import Pdb; Pdb().set_trace()
     df['fold'] = folds
     
     return df
 
 
-# In[32]:
+# In[7]:
 
 
 def main():
@@ -100,6 +100,7 @@ def main():
         
     df = make_folds(n_folds=args.n_folds)
     df.to_csv('folds.csv', index=None)
+   # from IPython.core.debugger import Pdb; Pdb().set_trace()
 
 if __name__ == '__main__':
     main()
