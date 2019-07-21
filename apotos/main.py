@@ -46,10 +46,10 @@ def is_env_notebook():
     return True
 
 
-# In[5]:
+# In[39]:
 
 
-def main():
+def main(*args):
     
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
@@ -72,12 +72,9 @@ def main():
     arg('--limit', type=int)
     arg('--fold', type=int, default=0)
   
-  #  from IPython.core.debugger import Pdb; Pdb().set_trace()
-    if is_env_notebook():
-        # jupyter-notebookの場合、ここで引数を選択しないといけない。
-        arg_list = ["--mode","train",
-                   "--run_root","model_1"]
-        args = parser.parse_args(args=arg_list)
+   # from IPython.core.debugger import Pdb; Pdb().set_trace()
+    if is_env_notebook():       
+        args = parser.parse_args(args=args[0])
     else:
         args = parser.parse_args()
 
@@ -356,10 +353,28 @@ def _reduce_loss(loss):
     return loss.sum() / loss.shape[0]
 
 
-# In[6]:
+# In[42]:
 
 
 if __name__ == '__main__':
-    main()
+    model_name = "mode_2"
+    
+    # jupyter-notebookの場合、ここで引数を選択しないといけない。
+    arg_list = ["--mode","train",
+               "--run_root",model_name,
+               "--limit","100", # TODO : 適宜変更
+               "--n-epochs","25"]
+    main(arg_list)
+    #print(N_CLASSES)
+
+
+# In[41]:
+
+
+if __name__ == '__main__':
+    # jupyter-notebookの場合、ここで引数を選択しないといけない。
+    arg_list = ["--mode","predict_test",
+               "--run_root",model_name]
+    main(arg_list)
     #print(N_CLASSES)
 
