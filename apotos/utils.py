@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[1]:
 
 
 from datetime import datetime
@@ -20,8 +20,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 
-#ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
-ON_KAGGLE = True
+ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
+#ON_KAGGLE = True
 
 def gmean_df(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby(level=0).agg(lambda x: gmean(list(x)))

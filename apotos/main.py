@@ -1,35 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
-
-
-import argparse
-from itertools import islice
-import json
-from pathlib import Path
-import shutil
-import warnings
-from typing import Dict
-
-import numpy as np
-import pandas as pd
-from sklearn.metrics import fbeta_score
-from sklearn.exceptions import UndefinedMetricWarning
-import torch
-from torch import nn, cuda
-from torch.optim import Adam
-import tqdm
-
-import models
-from dataset import TrainDataset, TTADataset, get_ids, N_CLASSES, DATA_ROOT
-from transforms import train_transform, test_transform
-from utils import (
-    write_event, load_model, mean_df, ThreadingDataLoader as DataLoader,
-    ON_KAGGLE)
-
-
-# In[2]:
+# In[21]:
 
 
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
@@ -46,7 +18,55 @@ def is_env_notebook():
     return True
 
 
-# In[39]:
+# In[22]:
+
+
+import argparse
+from itertools import islice
+import json
+from pathlib import Path
+import shutil
+import warnings
+from typing import Dict
+import os
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import fbeta_score
+from sklearn.exceptions import UndefinedMetricWarning
+import torch
+from torch import nn, cuda
+from torch.optim import Adam
+import tqdm
+
+import torch.nn.functional as F
+from sklearn.metrics import cohen_kappa_score
+
+from IPython.core.debugger import Pdb
+
+
+# In[23]:
+
+
+ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
+
+if ON_KAGGLE:
+    from . import models
+    from .dataset import TrainDataset, TTADataset, get_ids, N_CLASSES, DATA_ROOT
+    from .transforms import train_transform, test_transform
+    from .utils import (
+        write_event, load_model, mean_df, ThreadingDataLoader as DataLoader,
+        ON_KAGGLE)
+else:
+    import models
+    from dataset import TrainDataset, TTADataset, get_ids, N_CLASSES, DATA_ROOT
+    from transforms import train_transform, test_transform
+    from utils import (
+        write_event, load_model, mean_df, ThreadingDataLoader as DataLoader,
+        ON_KAGGLE)
+
+
+# In[24]:
 
 
 def main(*args):
@@ -57,6 +77,7 @@ def main(*args):
     arg('--mode', choices=['train', 'validate', 'predict_valid', 'predict_test'])
     arg('--run_root')
     arg('--model', default='resnet50')
+    arg('--loss',default="focalloss")
     arg('--pretrained', type=int, default=1)
     arg('--batch-size', type=int, default=64)
     arg('--step', type=int, default=1)
@@ -99,9 +120,15 @@ def main(*args):
             batch_size=args.batch_size,
             num_workers=args.workers,
         )
-    criterion = nn.BCEWithLogitsLoss(reduction='none')
+    
+    ## TODO 
+    criterion = FocalLoss()#nn.BCEWithLogitsLoss(reduction='none')
+    
     model = getattr(models, args.model)(
         num_classes=N_CLASSES, pretrained=args.pretrained)
+    
+ #   Pdb().set_trace()
+    
     use_cuda = cuda.is_available()
     fresh_params = list(model.fresh_params())
     all_params = list(model.parameters())
@@ -247,7 +274,7 @@ def train(args, model: nn.Module, criterion, *, params,
                 if use_cuda:
                     inputs, targets = inputs.cuda(), targets.cuda()
                 outputs = model(inputs)
-                loss = _reduce_loss(criterion(outputs, targets))
+                loss = criterion(outputs, targets)#_reduce_loss(criterion(outputs, targets))
                 batch_size = inputs.size(0)
                 (batch_size * loss).backward()
                 if (i + 1) % args.step == 0:
@@ -260,11 +287,15 @@ def train(args, model: nn.Module, criterion, *, params,
                 tq.set_postfix(loss=f'{mean_loss:.3f}')
                 if i and i % report_each == 0:
                     write_event(log, step, loss=mean_loss)
+          #  Pdb().set_trace()
             write_event(log, step, loss=mean_loss)
             tq.close()
             save(epoch + 1)
             valid_metrics = validation(model, criterion, valid_loader, use_cuda)
+            
+         #   Pdb().set_trace()
             write_event(log, step, **valid_metrics)
+            
             valid_loss = valid_metrics['valid_loss']
             valid_losses.append(valid_loss)
             
@@ -304,7 +335,8 @@ def validation(
                 inputs, targets = inputs.cuda(), targets.cuda()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
-            all_losses.append(_reduce_loss(loss).item())
+          #  all_losses.append(_reduce_loss(loss).item())
+            all_losses.append(loss.item())
             predictions = torch.sigmoid(outputs)
             all_predictions.append(predictions.cpu().numpy())
     all_predictions = np.concatenate(all_predictions)
@@ -313,17 +345,25 @@ def validation(
     def get_score(y_pred):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', category=UndefinedMetricWarning)
-            return fbeta_score(
-                all_targets, y_pred, beta=2, average='samples')
+          #  return fbeta_score(
+          #      all_targets, y_pred, beta=2, average='samples')
+            return qk(y_pred,all_targets)
 
     metrics = {}
-    argsorted = all_predictions.argsort(axis=1)
-    for threshold in [0.05, 0.10, 0.15, 0.20]:
-        metrics[f'valid_f2_th_{threshold:.2f}'] = get_score(
-            binarize_prediction(all_predictions, threshold, argsorted))
+    #argsorted = all_predictions.argsort(axis=1)
+    
+   # Pdb().set_trace()
+    #for threshold in [0.05, 0.10, 0.15, 0.20]:
+    #    metrics[f'valid_f2_th_{threshold:.2f}'] = get_score(
+    #        binarize_prediction(all_predictions, threshold, argsorted))
+    #metrics = get_score(all_predictions) 
+    
+ #   from IPython.core.debugger import Pdb; Pdb().set_trace()
+    metrics['valid_kapa'] = get_score(all_predictions)
     metrics['valid_loss'] = np.mean(all_losses)
-    print(' | '.join(f'{k} {v:.3f}' for k, v in sorted(
-        metrics.items(), key=lambda kv: -kv[1])))
+    #print(' | '.join(f'{k} {v:.3f}' for k, v in sorted(
+    #    metrics.items(), key=lambda kv: -kv[1])))
+    print(metrics)
 
     return metrics
 
@@ -352,29 +392,57 @@ def _make_mask(argsorted, top_n: int):
 def _reduce_loss(loss):
     return loss.sum() / loss.shape[0]
 
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2):
+        super().__init__()
+        self.gamma = gamma
 
-# In[42]:
+    def forward(self, logit, target):
+        target = target.float()
+        max_val = (-logit).clamp(min=0)
+        loss = logit - logit * target + max_val +                ((-max_val).exp() + (-logit - max_val).exp()).log()
+
+        invprobs = F.logsigmoid(-logit * (target * 2.0 - 1.0))
+        loss = (invprobs * self.gamma).exp() * loss
+        if len(loss.size())==2:
+            loss = loss.sum(dim=1)
+        return loss.mean()
+    
+def qk(y_pred, y):
+   ## Pdb().set_trace()
+    #y_pred = torch.from_numpy(y_pred)
+    y_pred = np.argmax(y_pred,axis=1)
+    y = np.argmax(y,axis=1)
+    #y = torch.argmax(y,dim=1)
+  #  Pdb().set_trace()
+    return cohen_kappa_score(y_pred, y, weights='quadratic')
+    #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
+
+
+# In[18]:
 
 
 if __name__ == '__main__':
-    model_name = "mode_2"
+    model_name = "model_1"
     
     # jupyter-notebookの場合、ここで引数を選択しないといけない。
     arg_list = ["--mode","train",
                "--run_root",model_name,
                "--limit","100", # TODO : 適宜変更
-               "--n-epochs","25"]
+               "--n-epochs","1",
+               '--workers',"16"]
     main(arg_list)
     #print(N_CLASSES)
 
 
-# In[41]:
+# In[20]:
 
 
 if __name__ == '__main__':
     # jupyter-notebookの場合、ここで引数を選択しないといけない。
     arg_list = ["--mode","predict_test",
-               "--run_root",model_name]
+               "--run_root",model_name,
+               "--limit","100"]
     main(arg_list)
     #print(N_CLASSES)
 

@@ -1,6 +1,6 @@
 from setuptools import setup
 
 setup(
-    name='imet',
-    packages=['imet'],
+    name='apotos',
+    packages=['apotos'],
 )

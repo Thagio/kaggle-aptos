@@ -4,14 +4,31 @@
 # In[1]:
 
 
-from functools import partial
+# FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
+def is_env_notebook():
+    """Determine wheather is the environment Jupyter Notebook"""
+    if 'get_ipython' not in globals():
+        # Python shell
+        return False
+    env_name = get_ipython().__class__.__name__
+    if env_name == 'TerminalInteractiveShell':
+        # IPython shell
+        return False
+    # Jupyter Notebook
+    return True
 
+
+# In[2]:
+
+
+from functools import partial
+import os
 import torch
 from torch import nn
 from torch.nn import functional as F
 import torchvision.models as M
 
-from utils import ON_KAGGLE
+ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
 
 
 class AvgPool(nn.Module):

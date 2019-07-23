@@ -4,23 +4,6 @@
 # In[1]:
 
 
-#import sys
-#sys.path.append('.')
-
-import argparse
-from collections import defaultdict, Counter
-import random
-
-import pandas as pd
-import tqdm
-
-from dataset import DATA_ROOT
-#from utils import is_env_notebook
-
-
-# In[2]:
-
-
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
 def is_env_notebook():
     """Determine wheather is the environment Jupyter Notebook"""
@@ -35,7 +18,29 @@ def is_env_notebook():
     return True
 
 
-# In[6]:
+# In[2]:
+
+
+#import sys
+#sys.path.append('.')
+
+import argparse
+from collections import defaultdict, Counter
+import random
+import os
+
+import pandas as pd
+import tqdm
+
+ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
+
+if ON_KAGGLE:
+    from .dataset import DATA_ROOT
+else:
+    from dataset import DATA_ROOT
+
+
+# In[3]:
 
 
 # make_foldsはマルチラベル用になってる。
@@ -78,13 +83,13 @@ def make_folds(n_folds:int) -> pd.DataFrame:
         #for cls in item.diagnosis:
         fold_cls_counts[fold, cls] += 1
         
-    from IPython.core.debugger import Pdb; Pdb().set_trace()
+#   from IPython.core.debugger import Pdb; Pdb().set_trace()
     df['fold'] = folds
     
     return df
 
 
-# In[7]:
+# In[4]:
 
 
 def main():

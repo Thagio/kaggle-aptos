@@ -21,7 +21,7 @@ def run(command):
 
 
 run('python setup.py develop --install-dir /kaggle/working')
-run('python -m imet.make_folds')
-run('python -m imet.main train model_1 --n-epochs 25')
-run('python -m imet.main predict_test model_1')
-run('python -m imet.make_submission model_1/test.h5 submission.csv --threshold 0.1')
+run('python -m apotos.make_folds')
+run('python -m apotos.main --mode train --run_root model_1 --n-epochs 25')
+run('python -m apotos.main --mode predict_test --run_root model_1')
+run('python -m apotos.make_submission --predictions model_1/test.h5 --output submission.csv')
