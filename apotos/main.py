@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[21]:
+# In[1]:
 
 
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[22]:
+# In[2]:
 
 
 import argparse
@@ -45,7 +45,7 @@ from sklearn.metrics import cohen_kappa_score
 from IPython.core.debugger import Pdb
 
 
-# In[23]:
+# In[3]:
 
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
@@ -66,7 +66,7 @@ else:
         ON_KAGGLE)
 
 
-# In[24]:
+# In[4]:
 
 
 def main(*args):
@@ -419,7 +419,7 @@ def qk(y_pred, y):
     #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
 
 
-# In[18]:
+# In[5]:
 
 
 if __name__ == '__main__':
@@ -435,7 +435,7 @@ if __name__ == '__main__':
     #print(N_CLASSES)
 
 
-# In[20]:
+# In[6]:
 
 
 if __name__ == '__main__':

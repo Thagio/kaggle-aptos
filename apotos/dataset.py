@@ -86,6 +86,36 @@ def crop_image_from_gray(img,tol=7):
             img = np.stack([img1,img2,img3],axis=-1)
     #         print(img.shape)
         return img
+    
+    
+
+
+# In[42]:
+
+
+def circle_crop(img, sigmaX=10):   
+    """
+    Create circular crop around image centre    
+    """    
+    # https://www.kaggle.com/ratthachat/aptos-updatedv14-preprocessing-ben-s-cropping
+    
+   # img = cv2.imread(img)
+    img = crop_image_from_gray(img)    
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    height, width, depth = img.shape    
+    
+    x = int(width/2)
+    y = int(height/2)
+    r = np.amin((x,y))
+    
+    circle_img = np.zeros((height, width), np.uint8)
+    cv2.circle(circle_img, (x,y), int(r), 1, thickness=-1)
+    img = cv2.bitwise_and(img, img, mask=circle_img)
+    img = crop_image_from_gray(img)
+    img=cv2.addWeighted ( img,4, cv2.GaussianBlur( img , (0,0) , sigmaX) ,-4 ,128)
+    
+    return img 
 
 
 # In[11]:
@@ -147,24 +177,27 @@ def get_ids(root: Path) -> List[str]:
     return sorted({p.name.split('_')[0] for p in root.glob('*.png')})
 
 
-# In[26]:
+# In[53]:
 
 
-def load_image(item, root: Path,img_size:int=600) -> Image.Image:
+def load_image(item, root: Path,img_size:int=600,circle:bool=True,sigmaX:int=10) -> Image.Image:
     IMG_SIZE = img_size
     image = cv2.imread(str(root / f'{item.id_code}.png'))
-    # https://www.kaggle.com/chanhu/eye-inference-num-class-1-ver3
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = crop_image_from_gray(image)
-    
     image = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
-    image = cv2.addWeighted ( image,4, cv2.GaussianBlur( image , (0,0) , 30) ,-4 ,128)
-  #  image = transforms.ToPILImage()(image)
+    
+    if circle:
+        image = circle_crop(image,sigmaX)
+    else:
+        # https://www.kaggle.com/chanhu/eye-inference-num-class-1-ver3
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = crop_image_from_gray(image)
+        image = cv2.addWeighted ( image,4, cv2.GaussianBlur( image , (0,0) , sigmaX) ,-4 ,128)
+      #  image = transforms.ToPILImage()(image)
 
     return Image.fromarray(image)
 
 
-# In[27]:
+# In[54]:
 
 
 if __name__ == "__main__":
@@ -195,11 +228,12 @@ if __name__ == "__main__":
 # 3. load_image関数でIMG_SIZE=600の場合、N=100の処理に、26sかかる
 
 
-# In[34]:
+# In[55]:
 
 
 if __name__ == "__main__":
         # imageの可視化
+    # circle cropなし
     NUM_SAMP=7
     SEED = 42
     fig = plt.figure(figsize=(25, 16))
@@ -212,8 +246,31 @@ if __name__ == "__main__":
          #   path=f"../input/aptos2019-blindness-detection/train_images/{['id_code']}.png"
            # image = load_ben_color(path,sigmaX=30)
           #  Pdb().set_trace()
-            image = load_image(item,root,img_size=600)
+            image = load_image(item,root,img_size=600,circle=False)
             plt.imshow(image)
             ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
         
+
+
+# In[56]:
+
+
+if __name__ == "__main__":
+        # imageの可視化
+    # circle cropあり
+    NUM_SAMP=7
+    SEED = 42
+    fig = plt.figure(figsize=(25, 16))
+    for class_id in sorted(np.unique(df.diagnosis)):
+        df_class_id = df.loc[df['diagnosis'] == class_id].sample(NUM_SAMP, random_state=SEED)
+        for i, idx in enumerate(np.arange(NUM_SAMP)):
+#            Pdb().set_trace()
+            item = df_class_id.iloc[idx]
+            ax = fig.add_subplot(5, NUM_SAMP, class_id * NUM_SAMP + i + 1, xticks=[], yticks=[])
+         #   path=f"../input/aptos2019-blindness-detection/train_images/{['id_code']}.png"
+           # image = load_ben_color(path,sigmaX=30)
+          #  Pdb().set_trace()
+            image = load_image(item,root,img_size=600,circle=True)
+            plt.imshow(image)
+            ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
 

@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[9]:
+# In[1]:
 
 
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[10]:
+# In[2]:
 
 
 import argparse
@@ -38,7 +38,7 @@ else:
     from main import binarize_prediction
 
 
-# In[28]:
+# In[3]:
 
 
 def main(*args):
@@ -79,7 +79,7 @@ def get_classes(item):
     return ' '.join(cls for cls, is_present in item.items() if is_present)
 
 
-# In[29]:
+# In[4]:
 
 
 if __name__ == '__main__':
