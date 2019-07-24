@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[2]:
+# In[7]:
 
 
 from pathlib import Path
@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 from IPython.core.debugger import Pdb
 
 
-# In[3]:
+# In[8]:
 
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
@@ -50,14 +50,14 @@ else:
     from utils import ON_KAGGLE
 
 
-# In[4]:
+# In[9]:
 
 
 N_CLASSES = 5
 DATA_ROOT = Path('../input/aptos2019-blindness-detection') #if ON_KAGGLE else './data')
 
 
-# In[3]:
+# In[10]:
 
 
 def crop_image1(img,tol=7):
@@ -88,7 +88,7 @@ def crop_image_from_gray(img,tol=7):
         return img
 
 
-# In[4]:
+# In[11]:
 
 
 class TrainDataset(Dataset):
@@ -115,7 +115,6 @@ class TrainDataset(Dataset):
         cls = item.diagnosis
         target[int(cls)] = 1
         return image, target
-
 
 class TTADataset:
     def __init__(self, root: Path, df: pd.DataFrame,
@@ -148,37 +147,55 @@ def get_ids(root: Path) -> List[str]:
     return sorted({p.name.split('_')[0] for p in root.glob('*.png')})
 
 
-# In[8]:
+# In[26]:
 
 
-def load_image(item, root: Path) -> Image.Image:
+def load_image(item, root: Path,img_size:int=600) -> Image.Image:
+    IMG_SIZE = img_size
     image = cv2.imread(str(root / f'{item.id_code}.png'))
     # https://www.kaggle.com/chanhu/eye-inference-num-class-1-ver3
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = crop_image_from_gray(image)
-  #  image = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
+    
+    image = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
     image = cv2.addWeighted ( image,4, cv2.GaussianBlur( image , (0,0) , 30) ,-4 ,128)
   #  image = transforms.ToPILImage()(image)
 
     return Image.fromarray(image)
 
 
-# In[11]:
+# In[27]:
 
 
 if __name__ == "__main__":
     # load_imageの実行テスト
     import pandas as pd
+    import time
 #    IMG_SIZE = 224
+    N = 100
     
+    start = time.time()
     df = pd.read_csv(DATA_ROOT / 'train.csv')
-    item = df.iloc[1]
-    root = DATA_ROOT / "train_images"
-    image = load_image(item,root)
-   
+    for i in np.arange(N):
+        item = df.iloc[i]
+        root = DATA_ROOT / "train_images"
+        image = load_image(item,root)
+        
+    end = time.time()
+    elapsed_time = end - start
+    
+    print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
 
-# In[12]:
+# In[ ]:
+
+
+# 1. load_image関数でIMG_SIZEを指定しなかった場合、N=100の処理に、48sかかる
+# 2. load_image関数でIMG_SIZE=100の場合、N=100の処理に、17sかかる
+# 3. load_image関数でIMG_SIZE=600の場合、N=100の処理に、26sかかる
+
+
+# In[34]:
 
 
 if __name__ == "__main__":
@@ -186,7 +203,7 @@ if __name__ == "__main__":
     NUM_SAMP=7
     SEED = 42
     fig = plt.figure(figsize=(25, 16))
-    for class_id in sorted(df.diagnosis):
+    for class_id in sorted(np.unique(df.diagnosis)):
         df_class_id = df.loc[df['diagnosis'] == class_id].sample(NUM_SAMP, random_state=SEED)
         for i, idx in enumerate(np.arange(NUM_SAMP)):
 #            Pdb().set_trace()
@@ -195,7 +212,8 @@ if __name__ == "__main__":
          #   path=f"../input/aptos2019-blindness-detection/train_images/{['id_code']}.png"
            # image = load_ben_color(path,sigmaX=30)
           #  Pdb().set_trace()
-            image = load_image(item,root)
+            image = load_image(item,root,img_size=600)
             plt.imshow(image)
-            ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code) )
+            ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
+        
 
