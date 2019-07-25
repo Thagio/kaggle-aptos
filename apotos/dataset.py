@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[7]:
+# In[2]:
 
 
 from pathlib import Path
@@ -46,18 +46,18 @@ if ON_KAGGLE:
     from .transforms import tensor_transform
     from .utils import ON_KAGGLE
 else:
-    from transforms import tensor_transform
+    from transforms import tensor_transform,train_transform
     from utils import ON_KAGGLE
 
 
-# In[9]:
+# In[4]:
 
 
 N_CLASSES = 5
 DATA_ROOT = Path('../input/aptos2019-blindness-detection') #if ON_KAGGLE else './data')
 
 
-# In[10]:
+# In[5]:
 
 
 def crop_image1(img,tol=7):
@@ -90,7 +90,7 @@ def crop_image_from_gray(img,tol=7):
     
 
 
-# In[42]:
+# In[6]:
 
 
 def circle_crop(img, sigmaX=10):   
@@ -118,7 +118,7 @@ def circle_crop(img, sigmaX=10):
     return img 
 
 
-# In[11]:
+# In[7]:
 
 
 class TrainDataset(Dataset):
@@ -166,7 +166,6 @@ class TTADataset:
 def load_transform_image(
         item, root: Path, image_transform: Callable, debug: bool = False):
     image = load_image(item, root)
-
         
     image = image_transform(image)
     if debug:
@@ -176,13 +175,22 @@ def load_transform_image(
 def get_ids(root: Path) -> List[str]:
     return sorted({p.name.split('_')[0] for p in root.glob('*.png')})
 
+def make_symlink_old_dataset(srt:Path,dst:Path):
+    # TODO : 作成中
+    
+    return 0
 
-# In[53]:
+
+# In[11]:
 
 
 def load_image(item, root: Path,img_size:int=600,circle:bool=True,sigmaX:int=10) -> Image.Image:
     IMG_SIZE = img_size
-    image = cv2.imread(str(root / f'{item.id_code}.png'))
+    # 本コンペのデータと過去のデータでファイル形式が異なるので読み込み方法を修正
+    # TODO : png, jpegの両方を読み込めるようにする
+    image = cv2.imread(str(root / f'{item.id_code}.png'))    
+
+  #  Pdb().set_trace()
     image = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
     
     if circle:
@@ -197,7 +205,7 @@ def load_image(item, root: Path,img_size:int=600,circle:bool=True,sigmaX:int=10)
     return Image.fromarray(image)
 
 
-# In[54]:
+# In[9]:
 
 
 if __name__ == "__main__":
@@ -208,10 +216,10 @@ if __name__ == "__main__":
     N = 100
     
     start = time.time()
+    root = DATA_ROOT / "train_images"
     df = pd.read_csv(DATA_ROOT / 'train.csv')
     for i in np.arange(N):
         item = df.iloc[i]
-        root = DATA_ROOT / "train_images"
         image = load_image(item,root)
         
     end = time.time()
@@ -220,7 +228,7 @@ if __name__ == "__main__":
     print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
 
-# In[ ]:
+# In[10]:
 
 
 # 1. load_image関数でIMG_SIZEを指定しなかった場合、N=100の処理に、48sかかる
@@ -228,13 +236,13 @@ if __name__ == "__main__":
 # 3. load_image関数でIMG_SIZE=600の場合、N=100の処理に、26sかかる
 
 
-# In[55]:
+# In[58]:
 
 
 if __name__ == "__main__":
         # imageの可視化
     # circle cropなし
-    NUM_SAMP=7
+    NUM_SAMP=10
     SEED = 42
     fig = plt.figure(figsize=(25, 16))
     for class_id in sorted(np.unique(df.diagnosis)):
@@ -252,13 +260,13 @@ if __name__ == "__main__":
         
 
 
-# In[56]:
+# In[57]:
 
 
 if __name__ == "__main__":
         # imageの可視化
     # circle cropあり
-    NUM_SAMP=7
+    NUM_SAMP=10
     SEED = 42
     fig = plt.figure(figsize=(25, 16))
     for class_id in sorted(np.unique(df.diagnosis)):
@@ -273,4 +281,83 @@ if __name__ == "__main__":
             image = load_image(item,root,img_size=600,circle=True)
             plt.imshow(image)
             ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
+
+
+# 1. 過去のコンペのデータデータセットの加工
+
+# In[25]:
+
+
+if __name__ == "__main__":
+    # load_imageの実行テスト
+    import pandas as pd
+    import time
+    from IPython.core.debugger import Pdb
+#    IMG_SIZE = 224
+    N = 100
+    
+    start = time.time()
+  #  df = pd.read_csv(DATA_ROOT / 'train.csv')
+    DATA_ROOT_OLD = Path('../input/diabetic-retinopathy-resized')
+    df_old = pd.read_csv(DATA_ROOT_OLD/'trainLabels.csv')               .rename(columns={'image':'id_code',
+                               "level":"diagnosis"})
+#    Pdb().set_trace()
+    root = DATA_ROOT_OLD / "resized_train/resized_train"
+    for i in np.arange(N):
+        item = df_old.iloc[i]   
+        image = load_image(item,root)
+        
+    end = time.time()
+    elapsed_time = end - start
+    
+    print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
+
+
+# In[24]:
+
+
+if __name__ == "__main__":
+        # imageの可視化
+    # circle cropあり
+    NUM_SAMP=10
+    SEED = 42
+    fig = plt.figure(figsize=(25, 16))
+    for class_id in sorted(np.unique(df_old.diagnosis)):
+        df_class_id = df_old.loc[df_old['diagnosis'] == class_id].sample(NUM_SAMP, random_state=SEED)
+        for i, idx in enumerate(np.arange(NUM_SAMP)):
+         #   Pdb().set_trace()
+            item = df_class_id.iloc[idx]
+            ax = fig.add_subplot(5, NUM_SAMP, class_id * NUM_SAMP + i + 1, xticks=[], yticks=[])
+         #   path=f"../input/aptos2019-blindness-detection/train_images/{['id_code']}.png"
+           # image = load_ben_color(path,sigmaX=30)
+            #Pdb().set_trace()
+            image = load_image(item,root,img_size=600,circle=True)
+            plt.imshow(image)
+            ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
+
+
+# # DataLoaderがうまく機能しているか確認
+
+# In[36]:
+
+
+if __name__ == "__main__":
+    from torchvision.transforms import (
+    ToTensor, Normalize, Compose, Resize, CenterCrop, RandomCrop,
+    RandomHorizontalFlip)
+    
+    train_transform = Compose([
+  #  RandomCrop(288),
+    Resize([288,288]),
+    RandomHorizontalFlip(),
+    ])
+    
+    root = DATA_ROOT / "train_images"
+    df = pd.read_csv(DATA_ROOT / 'train.csv')
+    image_transform = train_transform
+    data_set = TrainDataset(root=root,
+                           df=df,
+                           image_transform=image_transform)
+    
+    print(data_set)
 

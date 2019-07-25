@@ -12,6 +12,7 @@ from torchvision.transforms import (
     ToTensor, Normalize, Compose, Resize, CenterCrop, RandomCrop,
     RandomHorizontalFlip)
 
+IMG_SIZE = 288
 
 class RandomSizedCrop:
     """Random crop the given PIL.Image to a random size
@@ -58,14 +59,17 @@ class RandomSizedCrop:
         return crop(scale(img))
 
 
+# Resize(IMG_SIZE)にすると、正方形ではない画像が出力されるバグ(バグなのか知らんが)を確認した。
 train_transform = Compose([
-    RandomCrop(288),
+  #  RandomCrop(288),
+    Resize([IMG_SIZE,IMG_SIZE]),
     RandomHorizontalFlip(),
 ])
 
 
 test_transform = Compose([
-    RandomCrop(288),
+    #RandomCrop(288),
+    Resize([IMG_SIZE,IMG_SIZE]),
     RandomHorizontalFlip(),
 ])
 

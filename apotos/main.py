@@ -66,7 +66,7 @@ else:
         ON_KAGGLE)
 
 
-# In[4]:
+# In[20]:
 
 
 def main(*args):
@@ -92,6 +92,7 @@ def main(*args):
     arg('--debug', action='store_true')
     arg('--limit', type=int)
     arg('--fold', type=int, default=0)
+    # TODO : classificationかregressionかをオプションで追加できるようにする。
   
    # from IPython.core.debugger import Pdb; Pdb().set_trace()
     if is_env_notebook():       
@@ -109,6 +110,7 @@ def main(*args):
         folds = folds[folds['Id'].isin(set(get_ids(train_root)))]
     train_fold = folds[folds['fold'] != args.fold]
     valid_fold = folds[folds['fold'] == args.fold]
+    
     if args.limit:
         train_fold = train_fold[:args.limit]
         valid_fold = valid_fold[:args.limit]
@@ -179,9 +181,13 @@ def main(*args):
             workers=args.workers,
         )
         if args.mode == 'predict_valid':
-            predict(model, df=valid_fold, root=train_root,
-                    out_path=run_root / 'val.h5',
-                    **predict_kwargs)
+            #predict(model, df=valid_fold, root=train_root,
+            #        out_path=run_root / 'val.h5',
+            #        **predict_kwargs)
+            valid_loader = make_loader(valid_fold, test_transform)
+            #model: nn.Module, criterion, valid_loader, use_cuda,valid_predict:bool=False
+            validation(model,criterion,valid_loader,use_cuda,valid_predict=True,save_path=run_root)
+                        
         elif args.mode == 'predict_test':
             test_root = DATA_ROOT / (
                 'test_sample' if args.use_sample else 'test_images')
@@ -212,6 +218,7 @@ def predict(model, root: Path, df: pd.DataFrame, out_path: Path,
             outputs = torch.sigmoid(model(inputs))
             all_outputs.append(outputs.data.cpu().numpy())
             all_ids.extend(ids)
+            
     df = pd.DataFrame(
         data=np.concatenate(all_outputs),
         index=all_ids,
@@ -324,7 +331,7 @@ def train(args, model: nn.Module, criterion, *, params,
 
 
 def validation(
-        model: nn.Module, criterion, valid_loader, use_cuda,
+        model: nn.Module, criterion, valid_loader, use_cuda,valid_predict:bool=False,save_path:Path=""
         ) -> Dict[str, float]:
     model.eval()
     all_losses, all_predictions, all_targets = [], [], []
@@ -357,6 +364,12 @@ def validation(
     #    metrics[f'valid_f2_th_{threshold:.2f}'] = get_score(
     #        binarize_prediction(all_predictions, threshold, argsorted))
     #metrics = get_score(all_predictions) 
+    
+    if valid_predict:
+       # run_root = Path(args.run_root)
+        with open(save_path / "best_score.txt",mode="w") as f:
+            f.write("best valid kapa : {score}".format(score=get_score(all_predictions)))
+            f.write("best valid loss : {loss}".format(loss=np.mean(all_losses)))
     
  #   from IPython.core.debugger import Pdb; Pdb().set_trace()
     metrics['valid_kapa'] = get_score(all_predictions)
@@ -419,23 +432,29 @@ def qk(y_pred, y):
     #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
 
 
-# In[5]:
+# In[9]:
+
+
+if __name__ == "__main__":
+    model_name = "model_1"
+
+
+# In[26]:
 
 
 if __name__ == '__main__':
-    model_name = "model_1"
     
     # jupyter-notebookの場合、ここで引数を選択しないといけない。
     arg_list = ["--mode","train",
                "--run_root",model_name,
                "--limit","100", # TODO : 適宜変更
-               "--n-epochs","1",
+               "--n-epochs","3",
                '--workers',"16"]
     main(arg_list)
     #print(N_CLASSES)
 
 
-# In[6]:
+# In[27]:
 
 
 if __name__ == '__main__':
@@ -445,4 +464,16 @@ if __name__ == '__main__':
                "--limit","100"]
     main(arg_list)
     #print(N_CLASSES)
+
+
+# In[28]:
+
+
+if __name__ == '__main__':
+    # jupyter-notebookの場合、ここで引数を選択しないといけない。
+    arg_list = ["--mode","predict_valid",
+               "--run_root",model_name,
+               "--limit","100"]
+    
+    main(arg_list)
 
