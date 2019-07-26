@@ -342,10 +342,13 @@ if __name__ == "__main__":
 
 
 if __name__ == "__main__":
+    # Data Augmentationの結果の可視化
+    
     from torchvision.transforms import (
     ToTensor, Normalize, Compose, Resize, CenterCrop, RandomCrop,
     RandomHorizontalFlip)
     
+    # 学習データのtransform
     train_transform = Compose([
   #  RandomCrop(288),
     Resize([288,288]),

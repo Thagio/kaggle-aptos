@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[7]:
 
 
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[2]:
+# In[8]:
 
 
 import argparse
@@ -45,7 +45,7 @@ from sklearn.metrics import cohen_kappa_score
 from IPython.core.debugger import Pdb
 
 
-# In[3]:
+# In[9]:
 
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
@@ -66,7 +66,7 @@ else:
         ON_KAGGLE)
 
 
-# In[20]:
+# In[10]:
 
 
 def main(*args):
@@ -432,41 +432,53 @@ def qk(y_pred, y):
     #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
 
 
-# In[9]:
-
-
-if __name__ == "__main__":
-    model_name = "model_1"
-
-
-# In[26]:
+# In[ ]:
 
 
 if __name__ == '__main__':
+    import gc
+    folds = [0,1,2,3]
+    N_EPOCH = 20
+    # limit変更
     
-    # jupyter-notebookの場合、ここで引数を選択しないといけない。
-    arg_list = ["--mode","train",
-               "--run_root",model_name,
-               "--limit","100", # TODO : 適宜変更
-               "--n-epochs","3",
-               '--workers',"16"]
-    main(arg_list)
-    #print(N_CLASSES)
+    for fold in folds:
+        # 学習
+        # jupyter-notebookの場合、ここで引数を選択しないといけない。
+        train_args = ["--mode","train",
+                   "--run_root","model_{fold}".format(fold=fold),
+               #    "--limit","100", # TODO : 適宜変更
+                    "--fold","{fold}".format(fold=fold),
+                   "--n-epochs","{epoch}".format(epoch=N_EPOCH),
+                   '--workers',"16"]
+        
+        main(train_args)
+        
+        # validation
+        val_args = ["--mode","predict_valid",
+               "--run_root","model_{fold}".format(fold=fold),
+               #"--limit","100"
+                   ]
+        main(val_args)
+        
+        gc.collect()
+        
+        #print(N_CLASSES)
 
 
-# In[27]:
+# In[8]:
 
 
 if __name__ == '__main__':
     # jupyter-notebookの場合、ここで引数を選択しないといけない。
     arg_list = ["--mode","predict_test",
                "--run_root",model_name,
-               "--limit","100"]
+#               "--limit","100"
+               ]
     main(arg_list)
     #print(N_CLASSES)
 
 
-# In[28]:
+# In[9]:
 
 
 if __name__ == '__main__':
