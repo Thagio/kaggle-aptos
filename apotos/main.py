@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[7]:
+# In[1]:
 
 
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[8]:
+# In[2]:
 
 
 import argparse
@@ -45,7 +45,7 @@ from sklearn.metrics import cohen_kappa_score
 from IPython.core.debugger import Pdb
 
 
-# In[9]:
+# In[3]:
 
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
@@ -66,7 +66,7 @@ else:
         ON_KAGGLE)
 
 
-# In[10]:
+# In[4]:
 
 
 def main(*args):
@@ -81,7 +81,7 @@ def main(*args):
     arg('--pretrained', type=int, default=1)
     arg('--batch-size', type=int, default=64)
     arg('--step', type=int, default=1)
-    arg('--workers', type=int, default=2 if ON_KAGGLE else 4)
+    arg('--workers', type=int, default=4 if ON_KAGGLE else 4)
     arg('--lr', type=float, default=1e-4)
     arg('--patience', type=int, default=4)
     arg('--clean', action='store_true')
@@ -92,6 +92,7 @@ def main(*args):
     arg('--debug', action='store_true')
     arg('--limit', type=int)
     arg('--fold', type=int, default=0)
+    arg('--regression',type=int,default=0)
     # TODO : classificationかregressionかをオプションで追加できるようにする。
   
    # from IPython.core.debugger import Pdb; Pdb().set_trace()
@@ -114,21 +115,31 @@ def main(*args):
     if args.limit:
         train_fold = train_fold[:args.limit]
         valid_fold = valid_fold[:args.limit]
-
-    def make_loader(df: pd.DataFrame, image_transform) -> DataLoader:
+        
+    
+    def make_loader(df: pd.DataFrame, image_transform,regression=args.regression) -> DataLoader:
         return DataLoader(
-            TrainDataset(train_root, df, image_transform, debug=args.debug),
+            TrainDataset(train_root, df, image_transform, debug=args.debug,regression=regression),
             shuffle=True,
             batch_size=args.batch_size,
             num_workers=args.workers,
         )
     
-    ## TODO 
-    criterion = FocalLoss()#nn.BCEWithLogitsLoss(reduction='none')
     
-    model = getattr(models, args.model)(
-        num_classes=N_CLASSES, pretrained=args.pretrained)
+    ## TODO : regressionようにモデルを書き換え
     
+    if args.regression:
+        criterion = nn.MSELoss()
+        # TODO : 回帰モデルへ変更
+        model = getattr(models, args.model)(
+            num_classes=1, pretrained=args.pretrained)
+
+    else:
+        # 分類モデル
+        criterion = FocalLoss()#nn.BCEWithLogitsLoss(reduction='none') 
+        model = getattr(models, args.model)(
+            num_classes=N_CLASSES, pretrained=args.pretrained)
+
  #   Pdb().set_trace()
     
     use_cuda = cuda.is_available()
@@ -144,8 +155,8 @@ def main(*args):
         (run_root / 'params.json').write_text(
             json.dumps(vars(args), indent=4, sort_keys=True))
 
-        train_loader = make_loader(train_fold, train_transform)
-        valid_loader = make_loader(valid_fold, test_transform)
+        train_loader = make_loader(train_fold, train_transform,regression=args.regression)
+        valid_loader = make_loader(valid_fold, test_transform,regression=args.regression)
         print(f'{len(train_loader.dataset):,} items in train, '
               f'{len(valid_loader.dataset):,} in valid')
 
@@ -277,7 +288,10 @@ def train(args, model: nn.Module, criterion, *, params,
             
         try:
             mean_loss = 0
+          #  Pdb().set_trace()
             for i, (inputs, targets) in enumerate(tl):
+                
+                
                 if use_cuda:
                     inputs, targets = inputs.cuda(), targets.cuda()
                 outputs = model(inputs)
@@ -432,31 +446,41 @@ def qk(y_pred, y):
     #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
 
 
-# In[ ]:
+# In[5]:
 
 
 if __name__ == '__main__':
     import gc
     folds = [0,1,2,3]
-    N_EPOCH = 20
+    N_EPOCH = 25
+  #  model_name = "02_brightness_cotrast"
+    #model_name = "HueSaturationValue"
+    #model_name = "RandomGamma"
+  #  model_name = "regression"
+  #  model_name = "RandomSizeCrop_validation"
+  #  model_name = "CentorCrop_Oneof"
+    model_name = "test"
     # limit変更
     
     for fold in folds:
         # 学習
         # jupyter-notebookの場合、ここで引数を選択しないといけない。
         train_args = ["--mode","train",
-                   "--run_root","model_{fold}".format(fold=fold),
-               #    "--limit","100", # TODO : 適宜変更
+                   "--run_root","{model_name}_{fold}".format(model_name=model_name,fold=fold),
+                   "--limit","100", # TODO : 適宜変更
                     "--fold","{fold}".format(fold=fold),
                    "--n-epochs","{epoch}".format(epoch=N_EPOCH),
-                   '--workers',"16"]
+                   '--workers',"16",
+                      '--patience',"2"
+                    # "--regression","1"
+                     ]
         
         main(train_args)
         
         # validation
         val_args = ["--mode","predict_valid",
-               "--run_root","model_{fold}".format(fold=fold),
-               #"--limit","100"
+               "--run_root","{model_name}_{fold}".format(model_name=model_name,fold=fold),
+               "--limit","100"
                    ]
         main(val_args)
         
@@ -465,14 +489,14 @@ if __name__ == '__main__':
         #print(N_CLASSES)
 
 
-# In[8]:
+# In[ ]:
 
 
 if __name__ == '__main__':
     # jupyter-notebookの場合、ここで引数を選択しないといけない。
     arg_list = ["--mode","predict_test",
                "--run_root",model_name,
-#               "--limit","100"
+               "--limit","100"
                ]
     main(arg_list)
     #print(N_CLASSES)

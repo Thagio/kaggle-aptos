@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 from IPython.core.debugger import Pdb
 
 
-# In[8]:
+# In[31]:
 
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
@@ -55,6 +55,7 @@ else:
 
 N_CLASSES = 5
 DATA_ROOT = Path('../input/aptos2019-blindness-detection') #if ON_KAGGLE else './data')
+EXTERNAL_ROOT = Path("../input/diabetic-retinopathy-resized") # 外部データ
 
 
 # In[5]:
@@ -118,17 +119,23 @@ def circle_crop(img, sigmaX=10):
     return img 
 
 
-# In[7]:
+# In[16]:
+
+
+# 外部データもTrainDatasetで読み込める。
+# TODO : *jpegデータに対応できるようにする。
+# 回帰用のオプションを作成
 
 
 class TrainDataset(Dataset):
     def __init__(self, root: Path, df: pd.DataFrame,
-                 image_transform: Callable, debug: bool = True):
+                 image_transform: Callable, debug: bool = True,regression=False):
         super().__init__()
         self._root = root
         self._df = df
         self._image_transform = image_transform
         self._debug = debug
+        self.regression = regression
 
     def __len__(self):
         return len(self._df)
@@ -139,16 +146,25 @@ class TrainDataset(Dataset):
         #print(self._root)
         image = load_transform_image(
             item, self._root, self._image_transform, debug=self._debug)
-        target = torch.zeros(N_CLASSES)
+        
     #    for cls in item.attribute_ids.split():
     #        target[int(cls)] = 1
         cls = item.diagnosis
-        target[int(cls)] = 1
+        
+      #  Pdb().set_trace()
+        
+        if self.regression:
+            target = torch.tensor(cls)
+          #  target[0] = cls
+        else:
+            target = torch.zeros(N_CLASSES)
+            target[int(cls)] = 1
+            
         return image, target
 
 class TTADataset:
     def __init__(self, root: Path, df: pd.DataFrame,
-                 image_transform: Callable, tta: int):
+                 image_transform: Callable, tta: int,regression=False):
         self._root = root
         self._df = df
         self._image_transform = image_transform
@@ -160,17 +176,31 @@ class TTADataset:
     def __getitem__(self, idx):
         item = self._df.iloc[idx % len(self._df)]
         image = load_transform_image(item, self._root, self._image_transform)
+        
+        ## テスト用のローダーなので、item.id_codeを出力してもOK
         return image, item.id_code
 
-
 def load_transform_image(
-        item, root: Path, image_transform: Callable, debug: bool = False):
+        item, root: Path, image_transform: Callable, debug: bool = False,albumentation=True):
     image = load_image(item, root)
         
-    image = image_transform(image)
-    if debug:
-        image.save('_debug.png')
+    if albumentation:
+        image = np.array(image)
+        data = {"image":image}
+        image = image_transform(**data)
+        image = image["image"]
+        
+        # albumentationした後もdebug=Trueの際に、png画像を保存できるようにする
+    else:
+        # pytorch 標準の場合
+        image = image_transform(image)
+        if debug:
+            image.save('_debug.png')
+
+ #   Pdb().set_trace()
+    
     return tensor_transform(image)
+
 
 def get_ids(root: Path) -> List[str]:
     return sorted({p.name.split('_')[0] for p in root.glob('*.png')})
@@ -181,31 +211,51 @@ def make_symlink_old_dataset(srt:Path,dst:Path):
     return 0
 
 
-# In[11]:
+# In[116]:
 
+
+# TODO : 外部データの用の読み込みオプションでつける。*jpegなだけ。
 
 def load_image(item, root: Path,img_size:int=600,circle:bool=True,sigmaX:int=10) -> Image.Image:
     IMG_SIZE = img_size
     # 本コンペのデータと過去のデータでファイル形式が異なるので読み込み方法を修正
     # TODO : png, jpegの両方を読み込めるようにする
     image = cv2.imread(str(root / f'{item.id_code}.png'))    
-
-  #  Pdb().set_trace()
-    image = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
+   # Pdb().set_trace()
+            
+    image = cv2.resize(image, (IMG_SIZE, IMG_SIZE),interpolation = cv2.INTER_CUBIC)
     
     if circle:
         image = circle_crop(image,sigmaX)
     else:
+        # circle ではないcrop
         # https://www.kaggle.com/chanhu/eye-inference-num-class-1-ver3
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = crop_image_from_gray(image)
         image = cv2.addWeighted ( image,4, cv2.GaussianBlur( image , (0,0) , sigmaX) ,-4 ,128)
       #  image = transforms.ToPILImage()(image)
+    
+ #   print(image.shape)
+    image = cv2.resize(image, (IMG_SIZE, IMG_SIZE),interpolation = cv2.INTER_CUBIC)
 
     return Image.fromarray(image)
 
 
-# In[9]:
+# In[11]:
+
+
+# 過去コンペのデータセットを読み込めるようにする
+# 1. fold.csvに結合
+# 2. シンボリックリンクの作成
+# 3. jpegファイルを読み込めるようにする。
+
+def external_data_symlink():
+    
+    pass
+    
+
+
+# In[12]:
 
 
 if __name__ == "__main__":
@@ -220,7 +270,8 @@ if __name__ == "__main__":
     df = pd.read_csv(DATA_ROOT / 'train.csv')
     for i in np.arange(N):
         item = df.iloc[i]
-        image = load_image(item,root)
+        #item, root: Path, image_transform: Callable, debug: bool = False,albumentation=True):
+        image = load_transform_image(item,root,train_transform)
         
     end = time.time()
     elapsed_time = end - start
@@ -228,7 +279,7 @@ if __name__ == "__main__":
     print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
 
-# In[10]:
+# In[13]:
 
 
 # 1. load_image関数でIMG_SIZEを指定しなかった場合、N=100の処理に、48sかかる
@@ -236,7 +287,7 @@ if __name__ == "__main__":
 # 3. load_image関数でIMG_SIZE=600の場合、N=100の処理に、26sかかる
 
 
-# In[58]:
+# In[20]:
 
 
 if __name__ == "__main__":
@@ -254,13 +305,49 @@ if __name__ == "__main__":
          #   path=f"../input/aptos2019-blindness-detection/train_images/{['id_code']}.png"
            # image = load_ben_color(path,sigmaX=30)
           #  Pdb().set_trace()
-            image = load_image(item,root,img_size=600,circle=False)
+            image = load_image(item,root,img_size=600,circle=False,sigmaX=30)
+            #image = load_transform_image()
+          #  image = load_transform_image(item,root,train_transform)
+          #  Pdb().set_trace()
             plt.imshow(image)
             ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
         
 
 
-# In[57]:
+# In[114]:
+
+
+if __name__ == "__main__":
+    from albumentations import (Rotate,
+    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, 
+    Compose,Resize,RandomScale,RandomGamma,RandomCrop,CenterCrop,RandomSizedCrop
+)
+    
+    #INPUT_IMG_SIZE = 600
+    IMG_SIZE = 288
+    MIN_MAX_HEIGHT = [IMG_SIZE/2,IMG_SIZE]
+    
+    vis_transform = Compose([
+                 Resize(width=IMG_SIZE,height=IMG_SIZE),
+              #  RandomCrop(288),
+               # HorizontalFlip(),
+               # Rotate((-120, 120)),
+               # RandomBrightnessContrast(),
+               # HueSaturationValue(),
+               # RandomScale(),
+               # RandomGamma(),
+                #RandomCrop(int(IMG_SIZE * 0.8),int(IMG_SIZE * 0.8)),
+                RandomSizedCrop(min_max_height = MIN_MAX_HEIGHT,
+                               width = IMG_SIZE,
+                               height = IMG_SIZE)
+          #      CenterCrop(IMG_SIZE,IMG_SIZE)
+            ])
+
+
+# In[117]:
 
 
 if __name__ == "__main__":
@@ -277,8 +364,20 @@ if __name__ == "__main__":
             ax = fig.add_subplot(5, NUM_SAMP, class_id * NUM_SAMP + i + 1, xticks=[], yticks=[])
          #   path=f"../input/aptos2019-blindness-detection/train_images/{['id_code']}.png"
            # image = load_ben_color(path,sigmaX=30)
+           # Pdb().set_trace()
+            image = load_image(item,root,img_size=600,circle=True,sigmaX=20)
+            # Data Augmentation部分
+            image = np.array(image)
           #  Pdb().set_trace()
-            image = load_image(item,root,img_size=600,circle=True)
+          #  print(image.shape)
+            
+            data = {"image":image}
+            image = vis_transform(**data)
+            image = image["image"]
+
+            # FIXME : transformした画像を表示したい。
+            #image = load_transform_image(item,root,train_transform)
+            #img = Image.fromarray(np.uint8(image.numpy()))
             plt.imshow(image)
             ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
 
@@ -294,6 +393,7 @@ if __name__ == "__main__":
     import time
     from IPython.core.debugger import Pdb
 #    IMG_SIZE = 224
+
     N = 100
     
     start = time.time()
@@ -313,7 +413,7 @@ if __name__ == "__main__":
     print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
 
-# In[24]:
+# In[18]:
 
 
 if __name__ == "__main__":
@@ -329,38 +429,44 @@ if __name__ == "__main__":
             item = df_class_id.iloc[idx]
             ax = fig.add_subplot(5, NUM_SAMP, class_id * NUM_SAMP + i + 1, xticks=[], yticks=[])
          #   path=f"../input/aptos2019-blindness-detection/train_images/{['id_code']}.png"
-           # image = load_ben_color(path,sigmaX=30)
-            #Pdb().set_trace()
-            image = load_image(item,root,img_size=600,circle=True)
+            #image = load_ben_color(path,sigmaX=30)
+          #  image = load_image(item,root,img_size=600,circle=True)
+          #  Pdb().set_trace()
+            
             plt.imshow(image)
             ax.set_title('%d-%d-%s' % (class_id, idx, item.id_code))
 
 
 # # DataLoaderがうまく機能しているか確認
 
-# In[36]:
+# In[18]:
 
 
 if __name__ == "__main__":
-    # Data Augmentationの結果の可視化
-    
-    from torchvision.transforms import (
-    ToTensor, Normalize, Compose, Resize, CenterCrop, RandomCrop,
-    RandomHorizontalFlip)
-    
-    # 学習データのtransform
-    train_transform = Compose([
-  #  RandomCrop(288),
-    Resize([288,288]),
-    RandomHorizontalFlip(),
-    ])
-    
     root = DATA_ROOT / "train_images"
     df = pd.read_csv(DATA_ROOT / 'train.csv')
-    image_transform = train_transform
-    data_set = TrainDataset(root=root,
-                           df=df,
-                           image_transform=image_transform)
     
-    print(data_set)
+    train_loader = TrainDataset(root,df,train_transform,debug=False,regression=True)
+    
+    for i,v in enumerate(train_loader):
+        print(v)
+        break
+
+
+# # Data Augmentationの結果を可視化
+
+# In[35]:
+
+
+if __name__ == "__main__":
+    root = DATA_ROOT / "train_images"
+    df = pd.read_csv(DATA_ROOT / 'train.csv')
+    
+    item = df.iloc[1]
+    
+    image = load_image(item,root)
+    image = np.array(image)
+    data = {"image":image}
+    image = train_transform(**data)
+    image = image["image"]
 

@@ -35,9 +35,9 @@ import tqdm
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
 
 if ON_KAGGLE:
-    from .dataset import DATA_ROOT
+    from .dataset import DATA_ROOT,EXTERNAL_ROOT
 else:
-    from dataset import DATA_ROOT
+    from dataset import DATA_ROOT,EXTERNAL_ROOT
 
 
 # In[3]:
@@ -64,13 +64,13 @@ def make_folds_for_multilabel(n_folds: int) -> pd.DataFrame:
     df['fold'] = folds
     return df
 
-def make_folds(n_folds:int) -> pd.DataFrame:
+def make_folds(n_folds:int,seed:int=42) -> pd.DataFrame:
     df = pd.read_csv(DATA_ROOT / 'train.csv')
     cls_counts = Counter(cls for cls in df["diagnosis"])
     
     fold_cls_counts = defaultdict(int)
     folds = [-1] * len(df)
-    for item in tqdm.tqdm(df.sample(frac=1, random_state=42).itertuples(),
+    for item in tqdm.tqdm(df.sample(frac=1, random_state=seed).itertuples(),
                       total=len(df)):
     
         cls = item.diagnosis
@@ -87,6 +87,26 @@ def make_folds(n_folds:int) -> pd.DataFrame:
     df['fold'] = folds
     
     return df
+
+
+# In[12]:
+
+
+def external_data() -> pd.DataFrame:
+    df = pd.read_csv(EXTERNAL_ROOT / "trainLabels.csv")            .rename(columns = {"id_code":"image","diagnosis":"level"})
+    
+    df["fold"] = 99
+    
+    return df
+
+
+# In[13]:
+
+
+if __name__ == "__main__":
+    pass
+    # df = external_data()
+   # print(df.head())
 
 
 # In[4]:

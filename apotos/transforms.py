@@ -1,20 +1,38 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[2]:
 
 
 import random
 import math
 
 from PIL import Image
+import torchvision
 from torchvision.transforms import (
-    ToTensor, Normalize, Compose, Resize, CenterCrop, RandomCrop,
-    RandomHorizontalFlip,RandomRotation)
+    ToTensor, Normalize,)
+    #Compose,
+   # Resize, CenterCrop, RandomCrop,
+   # RandomHorizontalFlip,RandomRotation)
 
+#from albumentations import RandomBrightnessContrast#,Compose
+
+from albumentations import (Rotate,
+    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, 
+    Compose,Resize,RandomScale,RandomGamma,RandomCrop,CenterCrop,RandomSizedCrop
+)
+
+# ==========================================================================
+# パイパーパラメータの設定
 IMG_SIZE = 288
+ROTATE = 180
+# ==========================================================================
 
-class RandomSizedCrop:
+
+class _RandomSizedCrop:
     """Random crop the given PIL.Image to a random size
     of the original size and and a random aspect ratio
     of the original aspect ratio.
@@ -60,23 +78,45 @@ class RandomSizedCrop:
 
 
 # Resize(IMG_SIZE)にすると、正方形ではない画像が出力されるバグ(バグなのか知らんが)を確認した。
+# Cropを追加
+# 1. RandomSizedCrop
+# 2. CenterCrop
+# 3. RandomCrop
+# One_ofを使ってもよい気がしてきた。
+
+#MIN_MAX_HEIGHT = [IMG_SIZE/2,IMG_SIZE]
+
 train_transform = Compose([
   #  RandomCrop(288),
-    RandomHorizontalFlip(),
-    RandomRotation((-120, 120)),
-    Resize([IMG_SIZE,IMG_SIZE])
+    HorizontalFlip(),
+    Rotate((-ROTATE, ROTATE)),
+    RandomBrightnessContrast(),
+#    HueSaturationValue(),
+    RandomScale(),
+    RandomGamma(),
+  #  Resize(width=IMG_SIZE,height=IMG_SIZE),
+  #  RandomSizedCrop(min_max_height = MIN_MAX_HEIGHT,
+   #            width = IMG_SIZE,
+   #            height = IMG_SIZE)
+   # Resize(INPUT_IMG_SIZE,INPUT_IMG_SIZE),
+    OneOf([CenterCrop(IMG_SIZE,IMG_SIZE)],p=0.5),
+    OneOf([RandomCrop(IMG_SIZE,IMG_SIZE)],p=1),
 ])
 
 
+## TTAの時は、rotation, random vertical flipとか入れてもよいかもしれない。
 test_transform = Compose([
-    #RandomCrop(288),
-    RandomHorizontalFlip(),
- #   RandomRotation((-120, 120)),
-    Resize([IMG_SIZE,IMG_SIZE])
+    HorizontalFlip(),
+ #   Resize(width=IMG_SIZE,height=IMG_SIZE),
+  #  RandomSizedCrop(min_max_height = MIN_MAX_HEIGHT,
+  #         width = IMG_SIZE,
+  #         height = IMG_SIZE)
+ #   Resize(600,600),
+    Rotate((-ROTATE, ROTATE)),
+    RandomCrop(IMG_SIZE,IMG_SIZE),
 ])
 
-
-tensor_transform = Compose([
+tensor_transform = torchvision.transforms.Compose([
     ToTensor(),
     Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
