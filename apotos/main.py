@@ -70,7 +70,8 @@ else:
 
 
 def main(*args):
-    
+#def main():   
+   # print("do main")
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     
@@ -184,6 +185,7 @@ def main(*args):
                    use_cuda=use_cuda)
 
     elif args.mode.startswith('predict'):
+        print("load model predict")
         load_model(model, run_root / 'best-model.pt')
         predict_kwargs = dict(
             batch_size=args.batch_size,
@@ -395,6 +397,15 @@ def validation(
     return metrics
 
 
+def visualization():
+    """
+    GRAD-CAMによるNNが判断の根拠としている領域の可視化
+    
+    """
+    
+    pass
+
+
 def binarize_prediction(probabilities, threshold: float, argsorted=None,
                         min_labels=1, max_labels=10):
     """ Return matrix of 0/1 predictions, same shape as probabilities.
@@ -446,10 +457,17 @@ def qk(y_pred, y):
     #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
 
 
-# In[5]:
+# In[ ]:
 
 
 if __name__ == '__main__':
+    main()
+
+
+# In[17]:
+
+
+if __name__ == '__main__' and  not(ON_KAGGLE):
     import gc
     folds = [0,1,2,3]
     N_EPOCH = 25
@@ -459,7 +477,7 @@ if __name__ == '__main__':
   #  model_name = "regression"
   #  model_name = "RandomSizeCrop_validation"
   #  model_name = "CentorCrop_Oneof"
-    model_name = "test"
+    model_name = "CentorCrop_Rotation_Val"
     # limit変更
     
     for fold in folds:
@@ -467,7 +485,7 @@ if __name__ == '__main__':
         # jupyter-notebookの場合、ここで引数を選択しないといけない。
         train_args = ["--mode","train",
                    "--run_root","{model_name}_{fold}".format(model_name=model_name,fold=fold),
-                   "--limit","100", # TODO : 適宜変更
+             #      "--limit","100", # TODO : 適宜変更
                     "--fold","{fold}".format(fold=fold),
                    "--n-epochs","{epoch}".format(epoch=N_EPOCH),
                    '--workers',"16",
@@ -480,7 +498,7 @@ if __name__ == '__main__':
         # validation
         val_args = ["--mode","predict_valid",
                "--run_root","{model_name}_{fold}".format(model_name=model_name,fold=fold),
-               "--limit","100"
+        #       "--limit","100"
                    ]
         main(val_args)
         
@@ -489,24 +507,29 @@ if __name__ == '__main__':
         #print(N_CLASSES)
 
 
-# In[ ]:
+# In[12]:
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' and not(ON_KAGGLE):
+    
+    model_name = "CentorCrop_Rotation_Val/CentorCrop_Rotation_Val_0"
     # jupyter-notebookの場合、ここで引数を選択しないといけない。
     arg_list = ["--mode","predict_test",
                "--run_root",model_name,
-               "--limit","100"
+           #    "--limit","100",
+                "--tta","4"
                ]
     main(arg_list)
     #print(N_CLASSES)
 
 
-# In[9]:
+# In[7]:
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' and not(ON_KAGGLE):
     # jupyter-notebookの場合、ここで引数を選択しないといけない。
+    model_name = model_name + "_0"
+    
     arg_list = ["--mode","predict_valid",
                "--run_root",model_name,
                "--limit","100"]

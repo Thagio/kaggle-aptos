@@ -216,7 +216,7 @@ def make_symlink_old_dataset(srt:Path,dst:Path):
 
 # TODO : 外部データの用の読み込みオプションでつける。*jpegなだけ。
 
-def load_image(item, root: Path,img_size:int=600,circle:bool=True,sigmaX:int=10) -> Image.Image:
+def load_image(item, root: Path,img_size:int=600,circle:bool=False,sigmaX:int=10) -> Image.Image:
     IMG_SIZE = img_size
     # 本コンペのデータと過去のデータでファイル形式が異なるので読み込み方法を修正
     # TODO : png, jpegの両方を読み込めるようにする

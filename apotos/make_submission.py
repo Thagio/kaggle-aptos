@@ -57,8 +57,8 @@ def main(*args):
     
     sample_submission = pd.read_csv(
         DATA_ROOT / 'sample_submission.csv', index_col='id_code')
-    dfs = []
     
+    dfs = []
     for prediction in args.predictions:
         #Pdb().set_trace()
         df = pd.read_hdf(prediction, index_col='id_code')
@@ -79,12 +79,14 @@ def get_classes(item):
     return ' '.join(cls for cls, is_present in item.items() if is_present)
 
 
-# In[4]:
+# In[5]:
 
 
 if __name__ == '__main__':
     
-    args = ["--predictions","model_1/test.h5",
+    model_h5 = "model/model_1/test.h5"
+    
+    args = ["--predictions",model_h5,
             "--output","submission.csv"]
     main(args)
 

@@ -6,6 +6,7 @@
 
 import random
 import math
+import numpy as np
 
 from PIL import Image
 import torchvision
@@ -22,7 +23,7 @@ from albumentations import (Rotate,
     Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
     IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
     IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, 
-    Compose,Resize,RandomScale,RandomGamma,RandomCrop,CenterCrop,RandomSizedCrop
+    Compose,Resize,RandomScale,RandomGamma,RandomCrop,CenterCrop,RandomSizedCrop,Cutout,RandomSunFlare
 )
 
 # ==========================================================================
@@ -86,7 +87,41 @@ class _RandomSizedCrop:
 
 #MIN_MAX_HEIGHT = [IMG_SIZE/2,IMG_SIZE]
 
+# 下記、Kernelを参考にData Augmentationを作成
+'''Use case from https://www.kaggle.com/alexanderliao/image-augmentation-demo-with-albumentation/'''
+
+'''1. Rotate or Flip'''
+aug1 = OneOf([
+    Rotate(p=0.99, limit=160, border_mode=0,value=0), # value=black
+    Flip(p=0.5)
+    ],p=1)
+
+'''2. Adjust Brightness or Contrast'''
+aug2 = RandomBrightnessContrast(brightness_limit=0.45, contrast_limit=0.45,p=1)
+h_min=np.round(IMG_SIZE*0.72).astype(int)
+h_max= np.round(IMG_SIZE*0.9).astype(int)
+#print(h_min,h_max)
+
+'''3. Random Crop and then Resize'''
+#w2h_ratio = aspect ratio of cropping
+aug3 = RandomSizedCrop((h_min, h_max),IMG_SIZE,IMG_SIZE, w2h_ratio=IMG_SIZE/IMG_SIZE,p=1)
+
+'''4. CutOut Augmentation'''
+max_hole_size = int(IMG_SIZE/10)
+aug4 = Cutout(p=1,max_h_size=max_hole_size,max_w_size=max_hole_size,num_holes=8 )#default num_holes=8
+
+'''5. SunFlare Augmentation'''
+aug5 = RandomSunFlare(src_radius=max_hole_size,
+                      num_flare_circles_lower=10,
+                      num_flare_circles_upper=20,
+                      p=1)#default flare_roi=(0,0,1,0.5),
+
+# 学習時のData Augmentationを作成
 train_transform = Compose([
+    aug1,aug2,aug3,aug4,aug5
+],p=1)
+
+"""Compose([
   #  RandomCrop(288),
     HorizontalFlip(),
     Rotate((-ROTATE, ROTATE)),
@@ -101,11 +136,16 @@ train_transform = Compose([
    # Resize(INPUT_IMG_SIZE,INPUT_IMG_SIZE),
     OneOf([CenterCrop(IMG_SIZE,IMG_SIZE)],p=0.5),
     OneOf([RandomCrop(IMG_SIZE,IMG_SIZE)],p=1),
-])
+])"""
 
-
+# Validation, Test時のData Augmentationを定義
 ## TTAの時は、rotation, random vertical flipとか入れてもよいかもしれない。
 test_transform = Compose([
+    aug1,aug2,aug3,aug4,aug5
+],p=1)
+
+
+"""Compose([
     HorizontalFlip(),
  #   Resize(width=IMG_SIZE,height=IMG_SIZE),
   #  RandomSizedCrop(min_max_height = MIN_MAX_HEIGHT,
@@ -114,7 +154,7 @@ test_transform = Compose([
  #   Resize(600,600),
     Rotate((-ROTATE, ROTATE)),
     RandomCrop(IMG_SIZE,IMG_SIZE),
-])
+])"""
 
 tensor_transform = torchvision.transforms.Compose([
     ToTensor(),
