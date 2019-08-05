@@ -72,8 +72,11 @@ else:
 def main(*args):
 #def main():   
    # print("do main")
+    
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
+    
+    # TODO : "--modeにGradCAMを追加"
     
     arg('--mode', choices=['train', 'validate', 'predict_valid', 'predict_test'])
     arg('--run_root')
@@ -291,9 +294,7 @@ def train(args, model: nn.Module, criterion, *, params,
         try:
             mean_loss = 0
           #  Pdb().set_trace()
-            for i, (inputs, targets) in enumerate(tl):
-                
-                
+            for i, (inputs, targets) in enumerate(tl):        
                 if use_cuda:
                     inputs, targets = inputs.cuda(), targets.cuda()
                 outputs = model(inputs)
@@ -457,19 +458,20 @@ def qk(y_pred, y):
     #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
 
 
-# In[ ]:
+# In[5]:
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' and ON_KAGGLE:
     main()
 
 
-# In[17]:
+# In[ ]:
 
 
 if __name__ == '__main__' and  not(ON_KAGGLE):
     import gc
-    folds = [0,1,2,3]
+    folds = [2,3]#[0,1,
+             
     N_EPOCH = 25
   #  model_name = "02_brightness_cotrast"
     #model_name = "HueSaturationValue"
@@ -477,7 +479,10 @@ if __name__ == '__main__' and  not(ON_KAGGLE):
   #  model_name = "regression"
   #  model_name = "RandomSizeCrop_validation"
   #  model_name = "CentorCrop_Oneof"
-    model_name = "CentorCrop_Rotation_Val"
+    #model_name = "CentorCrop_Rotation_Val"
+  #  model_name = "Rockman_aug_nonCircleCrop"
+#    model_name = "Rockman_aug_CircleCrop"
+    model_name = "09_No_Crop"
     # limit変更
     
     for fold in folds:

@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 from IPython.core.debugger import Pdb
 
 
-# In[31]:
+# In[3]:
 
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
@@ -119,7 +119,7 @@ def circle_crop(img, sigmaX=10):
     return img 
 
 
-# In[16]:
+# In[7]:
 
 
 # 外部データもTrainDatasetで読み込める。
@@ -211,12 +211,12 @@ def make_symlink_old_dataset(srt:Path,dst:Path):
     return 0
 
 
-# In[116]:
+# In[8]:
 
 
 # TODO : 外部データの用の読み込みオプションでつける。*jpegなだけ。
 
-def load_image(item, root: Path,img_size:int=600,circle:bool=False,sigmaX:int=10) -> Image.Image:
+def load_image(item, root: Path,img_size:int=600,circle:bool=True,sigmaX:int=10) -> Image.Image:
     IMG_SIZE = img_size
     # 本コンペのデータと過去のデータでファイル形式が異なるので読み込み方法を修正
     # TODO : png, jpegの両方を読み込めるようにする
@@ -314,7 +314,7 @@ if __name__ == "__main__":
         
 
 
-# In[114]:
+# In[12]:
 
 
 if __name__ == "__main__":
@@ -346,8 +346,10 @@ if __name__ == "__main__":
           #      CenterCrop(IMG_SIZE,IMG_SIZE)
             ])
 
+    vis_transform = train_transform
 
-# In[117]:
+
+# In[13]:
 
 
 if __name__ == "__main__":
@@ -455,7 +457,7 @@ if __name__ == "__main__":
 
 # # Data Augmentationの結果を可視化
 
-# In[35]:
+# In[9]:
 
 
 if __name__ == "__main__":

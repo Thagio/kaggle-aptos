@@ -32,7 +32,6 @@ IMG_SIZE = 288
 ROTATE = 180
 # ==========================================================================
 
-
 class _RandomSizedCrop:
     """Random crop the given PIL.Image to a random size
     of the original size and and a random aspect ratio
@@ -107,7 +106,7 @@ h_max= np.round(IMG_SIZE*0.9).astype(int)
 aug3 = RandomSizedCrop((h_min, h_max),IMG_SIZE,IMG_SIZE, w2h_ratio=IMG_SIZE/IMG_SIZE,p=1)
 
 '''4. CutOut Augmentation'''
-max_hole_size = int(IMG_SIZE/10)
+max_hole_size = int(IMG_SIZE/5)
 aug4 = Cutout(p=1,max_h_size=max_hole_size,max_w_size=max_hole_size,num_holes=8 )#default num_holes=8
 
 '''5. SunFlare Augmentation'''
@@ -118,7 +117,12 @@ aug5 = RandomSunFlare(src_radius=max_hole_size,
 
 # 学習時のData Augmentationを作成
 train_transform = Compose([
-    aug1,aug2,aug3,aug4,aug5
+    aug1,
+    aug2,
+  #  aug3,
+    aug4,
+    aug5,
+    Resize(IMG_SIZE,IMG_SIZE),
 ],p=1)
 
 """Compose([
@@ -141,7 +145,15 @@ train_transform = Compose([
 # Validation, Test時のData Augmentationを定義
 ## TTAの時は、rotation, random vertical flipとか入れてもよいかもしれない。
 test_transform = Compose([
-    aug1,aug2,aug3,aug4,aug5
+ #   Rotate((-ROTATE, ROTATE)),
+ #   Flip(p=0.5),
+ #   Resize(IMG_SIZE,IMG_SIZE)
+    aug1,
+    aug2,
+    Resize(IMG_SIZE,IMG_SIZE)
+    #aug3,
+    #aug4,
+    #aug5
 ],p=1)
 
 
