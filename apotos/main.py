@@ -97,6 +97,7 @@ def main(*args):
     arg('--limit', type=int)
     arg('--fold', type=int, default=0)
     arg('--regression',type=int,default=0)
+    arg('--finetuning',type=int,default=1)
     # TODO : classificationかregressionかをオプションで追加できるようにする。
   
    # from IPython.core.debugger import Pdb; Pdb().set_trace()
@@ -121,10 +122,10 @@ def main(*args):
         valid_fold = valid_fold[:args.limit]
         
     
-    def make_loader(df: pd.DataFrame, image_transform,regression=args.regression) -> DataLoader:
+    def make_loader(df: pd.DataFrame, image_transform,regression=args.regression,shuffle=False,balanced=True) -> DataLoader:
         return DataLoader(
-            TrainDataset(train_root, df, image_transform, debug=args.debug,regression=regression),
-            shuffle=True,
+            TrainDataset(train_root, df, image_transform, debug=args.debug,regression=regression,balanced=balanced),
+            shuffle=shuffle,
             batch_size=args.batch_size,
             num_workers=args.workers,
         )
@@ -159,8 +160,8 @@ def main(*args):
         (run_root / 'params.json').write_text(
             json.dumps(vars(args), indent=4, sort_keys=True))
 
-        train_loader = make_loader(train_fold, train_transform,regression=args.regression)
-        valid_loader = make_loader(valid_fold, test_transform,regression=args.regression)
+        train_loader = make_loader(train_fold, train_transform,regression=args.regression,balanced=True)
+        valid_loader = make_loader(valid_fold, test_transform,regression=args.regression,balanced=False)
         print(f'{len(train_loader.dataset):,} items in train, '
               f'{len(valid_loader.dataset):,} in valid')
 
@@ -180,11 +181,21 @@ def main(*args):
                 train(params=all_params, **train_kwargs)
         else:
             train(params=all_params, **train_kwargs)
+            
+        # fine-tunig after balanced learning 
+        if args.finetuning:
+            print("Start Fine-tuning")
+            TUNING_EPOCH = 3
+            train_loader = make_loader(train_fold, train_transform,regression=args.regression,balanced=False)
+            # 学習率を小さくする
+            args.lr = args.lr / 5
+            train_kwargs["train_loader"] = train_loader
+            train(params=all_params,n_epochs=args.n_epochs+TUNING_EPOCH,**train_kwargs,finetuning=args.finetuning)
 
     elif args.mode == 'validate':
         valid_loader = make_loader(valid_fold, test_transform)
         load_model(model, run_root / 'model.pt')
-        validation(model, criterion, tqdm.tqdm(valid_loader, desc='Validation'),
+        validation(model, criterion, tqdm.tqdm(valid_loader, desc='Validation',valid_fold=valid_fold),
                    use_cuda=use_cuda)
 
     elif args.mode.startswith('predict'):
@@ -200,9 +211,12 @@ def main(*args):
             #predict(model, df=valid_fold, root=train_root,
             #        out_path=run_root / 'val.h5',
             #        **predict_kwargs)
-            valid_loader = make_loader(valid_fold, test_transform)
+            
+            valid_loader = make_loader(valid_fold, test_transform,shuffle=False,balanced=False)
             #model: nn.Module, criterion, valid_loader, use_cuda,valid_predict:bool=False
-            validation(model,criterion,valid_loader,use_cuda,valid_predict=True,save_path=run_root)
+            
+            # TODO : valid foldに予測結果をくっ付ける操作を追加
+            validation(model,criterion,valid_loader,use_cuda,valid_fold=valid_fold,valid_predict=True,save_path=run_root)
                         
         elif args.mode == 'predict_test':
             test_root = DATA_ROOT / (
@@ -246,7 +260,7 @@ def predict(model, root: Path, df: pd.DataFrame, out_path: Path,
 
 def train(args, model: nn.Module, criterion, *, params,
           train_loader, valid_loader, init_optimizer, use_cuda,
-          n_epochs=None, patience=2, max_lr_changes=2) -> bool:
+          n_epochs=None, patience=2, max_lr_changes=2,finetuning=False) -> bool:
     
     lr = args.lr
     n_epochs = n_epochs or args.n_epochs
@@ -263,10 +277,19 @@ def train(args, model: nn.Module, criterion, *, params,
         step = state['step']
         best_valid_loss = state['best_valid_loss']
         
+    if best_model_path.exists() and finetuning:
+        state = load_model(model,best_model_path)
+        #epoch = 1
+        #step = 0
+        epoch = state['epoch']
+        step = state['step']
+        best_valid_loss = state['best_valid_loss']
+    
     else:
         epoch = 1
         step = 0
         best_valid_loss = float('inf')
+        
     lr_changes = 0
 
     save = lambda ep: torch.save({
@@ -348,7 +371,7 @@ def train(args, model: nn.Module, criterion, *, params,
 
 
 def validation(
-        model: nn.Module, criterion, valid_loader, use_cuda,valid_predict:bool=False,save_path:Path=""
+        model: nn.Module, criterion, valid_loader, use_cuda,valid_fold=None,valid_predict:bool=False,save_path:Path=""
         ) -> Dict[str, float]:
     model.eval()
     all_losses, all_predictions, all_targets = [], [], []
@@ -365,6 +388,8 @@ def validation(
             all_predictions.append(predictions.cpu().numpy())
     all_predictions = np.concatenate(all_predictions)
     all_targets = np.concatenate(all_targets)
+    
+#    Pdb().set_trace()
 
     def get_score(y_pred):
         with warnings.catch_warnings():
@@ -383,6 +408,11 @@ def validation(
     #metrics = get_score(all_predictions) 
     
     if valid_predict:
+     #   Pdb().set_trace()
+        # TOOD : 予測結果をpd データフレーム形式で保存
+        valid_fold["prediction"] = all_predictions.argmax(axis=1)
+        valid_fold.to_csv(save_path / "valid_prediction.csv",index=False)
+        
        # run_root = Path(args.run_root)
         with open(save_path / "best_score.txt",mode="w") as f:
             f.write("best valid kapa : {score}".format(score=get_score(all_predictions)))
@@ -470,9 +500,9 @@ if __name__ == '__main__' and ON_KAGGLE:
 
 if __name__ == '__main__' and  not(ON_KAGGLE):
     import gc
-    folds = [2,3]#[0,1,
+    folds = [0,1,2,3]#[0,1,
              
-    N_EPOCH = 25
+  #  N_EPOCH = 25
   #  model_name = "02_brightness_cotrast"
     #model_name = "HueSaturationValue"
     #model_name = "RandomGamma"
@@ -481,8 +511,11 @@ if __name__ == '__main__' and  not(ON_KAGGLE):
   #  model_name = "CentorCrop_Oneof"
     #model_name = "CentorCrop_Rotation_Val"
   #  model_name = "Rockman_aug_nonCircleCrop"
-#    model_name = "Rockman_aug_CircleCrop"
-    model_name = "09_No_Crop"
+   # model_name = "Rockman_aug_CircleCrop"
+  #  model_name = "10_test"
+    model_name = "11_No_Crop_balanced_finetuning"
+
+    N_EPOCH = 10
     # limit変更
     
     for fold in folds:
@@ -490,11 +523,12 @@ if __name__ == '__main__' and  not(ON_KAGGLE):
         # jupyter-notebookの場合、ここで引数を選択しないといけない。
         train_args = ["--mode","train",
                    "--run_root","{model_name}_{fold}".format(model_name=model_name,fold=fold),
-             #      "--limit","100", # TODO : 適宜変更
+               #    "--limit","100", # TODO : 適宜変更
                     "--fold","{fold}".format(fold=fold),
                    "--n-epochs","{epoch}".format(epoch=N_EPOCH),
                    '--workers',"16",
-                      '--patience',"2"
+                      '--patience',"2",
+                      "--finetuning","1"
                     # "--regression","1"
                      ]
         
@@ -503,11 +537,12 @@ if __name__ == '__main__' and  not(ON_KAGGLE):
         # validation
         val_args = ["--mode","predict_valid",
                "--run_root","{model_name}_{fold}".format(model_name=model_name,fold=fold),
-        #       "--limit","100"
+             #  "--limit","100"
                    ]
         main(val_args)
         
         gc.collect()
+    #    break
         
         #print(N_CLASSES)
 

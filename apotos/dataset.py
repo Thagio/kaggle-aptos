@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
 
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[2]:
+# In[4]:
 
 
 from pathlib import Path
@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 from IPython.core.debugger import Pdb
 
 
-# In[3]:
+# In[5]:
 
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
@@ -50,7 +50,7 @@ else:
     from utils import ON_KAGGLE
 
 
-# In[4]:
+# In[6]:
 
 
 N_CLASSES = 5
@@ -58,7 +58,7 @@ DATA_ROOT = Path('../input/aptos2019-blindness-detection') #if ON_KAGGLE else '.
 EXTERNAL_ROOT = Path("../input/diabetic-retinopathy-resized") # 外部データ
 
 
-# In[5]:
+# In[7]:
 
 
 def crop_image1(img,tol=7):
@@ -88,10 +88,9 @@ def crop_image_from_gray(img,tol=7):
     #         print(img.shape)
         return img
     
-    
 
 
-# In[6]:
+# In[8]:
 
 
 def circle_crop(img, sigmaX=10):   
@@ -119,28 +118,62 @@ def circle_crop(img, sigmaX=10):
     return img 
 
 
-# In[7]:
+# In[143]:
 
 
 # 外部データもTrainDatasetで読み込める。
 # TODO : *jpegデータに対応できるようにする。
 # 回帰用のオプションを作成
 
+# balancedデータセットを作成
+# Balanced Mini-batch Training for Imbalanced Image Data Classification with Neural Network 
 
 class TrainDataset(Dataset):
     def __init__(self, root: Path, df: pd.DataFrame,
-                 image_transform: Callable, debug: bool = True,regression=False):
+                 image_transform: Callable, debug: bool = True,regression=False,balanced=False,seed:int=42):
         super().__init__()
         self._root = root
         self._df = df
         self._image_transform = image_transform
         self._debug = debug
-        self.regression = regression
+        self._regression = regression
+        self._balanced = balanced
+        self._seed = seed
+        self._step = 0
+        self._epoch = 0
+        
+        if self._balanced:
+            self._balanced_df()
 
     def __len__(self):
         return len(self._df)
+    
+    def _balanced_df(self):
+        from imblearn.over_sampling import RandomOverSampler
+        
+        ros = RandomOverSampler(random_state=self._seed)
+        
+        X_resampled, y_resampled = ros.fit_sample(np.array(self._df["id_code"]).reshape(-1,1),np.array(self._df["diagnosis"]))
+        #print(sorted(Counter(y_resampled).items()))
+        df_resampled = pd.DataFrame({"id_code":X_resampled.reshape((1,-1))[0],
+                          "diagnosis":y_resampled})
 
-    def __getitem__(self, idx: int):
+        classes = np.unique(df_resampled["diagnosis"])
+        # 乱数のSEEDを書き換えないといけない
+        # SEEDもちょくちょく変わるようにしたい。
+        diagnosis_df = []
+
+        for cls in classes:
+            tmp_diagnosis_df = df_resampled[df_resampled["diagnosis"]==cls].sample(frac=1,random_state=self._seed).reset_index(drop=True)
+            tmp_diagnosis_df["index"] = tmp_diagnosis_df.index
+
+            diagnosis_df.append(tmp_diagnosis_df)
+
+        df_resampled_sorted = pd.concat(diagnosis_df).sort_values("index").drop("index", axis=1)
+        
+        self._df = df_resampled_sorted
+        
+    def __getitem__(self, idx: int):        
         item = self._df.iloc[idx]
         #print(item)
         #print(self._root)
@@ -153,12 +186,21 @@ class TrainDataset(Dataset):
         
       #  Pdb().set_trace()
         
-        if self.regression:
+        if self._regression:
             target = torch.tensor(cls)
           #  target[0] = cls
         else:
             target = torch.zeros(N_CLASSES)
             target[int(cls)] = 1
+            
+        self._step = self._step + 1
+        
+        if self._step == self._df.shape[0]+1 and self._balanced:
+          #  print("aaa")
+            self._seed = self._seed + 1
+            self._balanced_df()
+            self._epoch = self._epoch + 1
+            self._step = 0
             
         return image, target
 
@@ -211,7 +253,7 @@ def make_symlink_old_dataset(srt:Path,dst:Path):
     return 0
 
 
-# In[8]:
+# In[10]:
 
 
 # TODO : 外部データの用の読み込みオプションでつける。*jpegなだけ。
@@ -415,7 +457,7 @@ if __name__ == "__main__":
     print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
 
-# In[18]:
+# In[144]:
 
 
 if __name__ == "__main__":
@@ -471,4 +513,58 @@ if __name__ == "__main__":
     data = {"image":image}
     image = train_transform(**data)
     image = image["image"]
+
+
+# # データローダーを以下の論文にしたがって改良
+
+# In[147]:
+
+
+if __name__ == "__main__":
+    from utils import (
+        write_event, load_model, mean_df, ThreadingDataLoader as DataLoader)
+    
+    #FOLD = 0
+    root = DATA_ROOT / "train_images"
+    train_root = DATA_ROOT / 'train_images'
+    df = pd.read_csv(DATA_ROOT / 'train.csv').head(128)
+    BATCH_SIZE = 64
+    regression = False
+    shuffle = False
+    
+    train_loader = DataLoader(
+            TrainDataset(train_root, df, train_transform,balanced=True,seed=128),
+            shuffle=shuffle,
+            batch_size=BATCH_SIZE,
+            num_workers=16,
+    )
+    
+    for batch in train_loader:
+        print(batch[1].argmax(dim=1))
+        
+
+
+# In[43]:
+
+
+if __name__ == "__main__":
+    from imblearn.over_sampling import RandomOverSampler
+    ros = RandomOverSampler(random_state=0)
+    X_resampled, y_resampled = ros.fit_sample(np.array(df["id_code"]).reshape(-1,1),np.array(df["diagnosis"]))
+    #print(sorted(Counter(y_resampled).items()))
+    df_resampled = pd.DataFrame({"id_code":X_resampled.reshape((1,-1))[0],
+                      "diagnosis":y_resampled})
+
+    classes = np.unique(df_resampled["diagnosis"])
+    # 乱数のSEEDを書き換えないといけない
+    # SEEDもちょくちょく変わるようにしたい。
+    diagnosis_df = []
+
+    for cls in classes:
+        tmp_diagnosis_df = df_resampled[df_resampled["diagnosis"]==cls].sample(frac=1).reset_index(drop=True)
+        tmp_diagnosis_df["index"] = tmp_diagnosis_df.index
+
+        diagnosis_df.append(tmp_diagnosis_df)
+
+    df_resampled_sorted = pd.concat(diagnosis_df).sort_values("index").drop("index", axis=1)
 

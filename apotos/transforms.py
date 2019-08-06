@@ -120,6 +120,8 @@ train_transform = Compose([
     aug1,
     aug2,
   #  aug3,
+    RandomScale(),
+    RandomGamma(),
     aug4,
     aug5,
     Resize(IMG_SIZE,IMG_SIZE),
