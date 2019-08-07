@@ -66,7 +66,7 @@ else:
         ON_KAGGLE)
 
 
-# In[4]:
+# In[8]:
 
 
 def main(*args):
@@ -114,8 +114,15 @@ def main(*args):
     
     if args.use_sample:
         folds = folds[folds['Id'].isin(set(get_ids(train_root)))]
+    
+  #  Pdb().set_trace()
+    # -1 はleakデータ
     train_fold = folds[folds['fold'] != args.fold]
+    leak_fold = folds[folds['fold'] == -1]
+    train_fold = pd.concat([train_fold,leak_fold])
+    
     valid_fold = folds[folds['fold'] == args.fold]
+    
     
     if args.limit:
         train_fold = train_fold[:args.limit]
@@ -185,7 +192,7 @@ def main(*args):
         # fine-tunig after balanced learning 
         if args.finetuning:
             print("Start Fine-tuning")
-            TUNING_EPOCH = 3
+            TUNING_EPOCH = 5
             train_loader = make_loader(train_fold, train_transform,regression=args.regression,balanced=False)
             # 学習率を小さくする
             args.lr = args.lr / 5
@@ -488,7 +495,7 @@ def qk(y_pred, y):
     #return torch.tensor(cohen_kappa_score(torch.round(y_pred), y, weights='quadratic'), device='cuda:0')
 
 
-# In[5]:
+# In[4]:
 
 
 if __name__ == '__main__' and ON_KAGGLE:
@@ -500,7 +507,12 @@ if __name__ == '__main__' and ON_KAGGLE:
 
 if __name__ == '__main__' and  not(ON_KAGGLE):
     import gc
-    folds = [0,1,2,3]#[0,1,
+    
+    ###########################################################
+    # FOLDを修正
+    
+    folds = [0,1,2,3]
+             #1,2,3]#[0,1,
              
   #  N_EPOCH = 25
   #  model_name = "02_brightness_cotrast"
@@ -513,8 +525,11 @@ if __name__ == '__main__' and  not(ON_KAGGLE):
   #  model_name = "Rockman_aug_nonCircleCrop"
    # model_name = "Rockman_aug_CircleCrop"
   #  model_name = "10_test"
-    model_name = "11_No_Crop_balanced_finetuning"
-
+#    model_name = "11_No_Crop_balanced_finetuning"
+  #  model_name = "12_add_11_scale_and_gamma"
+   # model_name = "13_nodup"
+    model_name = "14_nodup_refine"
+    
     N_EPOCH = 10
     # limit変更
     

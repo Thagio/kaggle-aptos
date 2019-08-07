@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 # FIXME  : 以下の関数は定義されたファイルの形式に依存するので、utilsに記載できない。
@@ -18,7 +18,7 @@ def is_env_notebook():
     return True
 
 
-# In[2]:
+# In[3]:
 
 
 #import sys
@@ -31,6 +31,7 @@ import os
 
 import pandas as pd
 import tqdm
+from IPython.core.debugger import Pdb
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
 
@@ -40,7 +41,7 @@ else:
     from dataset import DATA_ROOT,EXTERNAL_ROOT
 
 
-# In[3]:
+# In[11]:
 
 
 # make_foldsはマルチラベル用になってる。
@@ -64,15 +65,55 @@ def make_folds_for_multilabel(n_folds: int) -> pd.DataFrame:
     df['fold'] = folds
     return df
 
-def make_folds(n_folds:int,seed:int=42) -> pd.DataFrame:
-    df = pd.read_csv(DATA_ROOT / 'train.csv')
+def make_folds(n_folds:int,seed:int=42,rmdup:bool=True) -> pd.DataFrame:
+    if rmdup:
+        # 重複除去について
+        strmd5 = (pd.read_csv("../input/strmd5/strMd5.csv").
+                 query("strMd5_nunique == 1")) # ラベルの不安な検体は除外 2検体はある
+
+        # 学習データとテストデータのフラグを作成
+        strmd5["dataset"] = ["train" if diagnosis >= 0 else "test" for diagnosis in strmd5["diagnosis"]]
+        # テストデータ
+        strmd5["strMd5_test_count"] = strmd5.strMd5_count - strmd5.strMd5_train_count
+
+        # 学習データの中でテストデータに存在するデータをリークと定義。
+        strmd5["leak"] = ["leak" if tup["dataset"] == "train" and tup["strMd5_test_count"] >=1 else "not leak" 
+                          for i,tup in strmd5.loc[:,["strMd5_test_count","dataset"]].iterrows()]
+
+        # strmd5 train
+        strmd5_train = (strmd5.
+                        query("dataset == 'train' and leak == 'not leak'").
+                        drop_duplicates(subset=["strMd5","diagnosis"]).
+                        reset_index(drop=True)
+                       )
+        
+        strmd5_train["diagnosis"] = strmd5_train["diagnosis"].astype("int64")
+
+        # strmd5 train leak
+        strmd5_train_leak = (strmd5.
+                             query("dataset == 'train' and leak == 'leak'").
+                             drop_duplicates(subset=["strMd5","diagnosis"]).
+                             reset_index(drop=True).
+                             loc[:,["id_code","diagnosis"]]
+                            )
+        
+        strmd5_train_leak["fold"] = -1
+        
+        
+        df = strmd5_train.loc[:,["id_code","diagnosis"]]
+        
+    else:
+        df = pd.read_csv(DATA_ROOT / 'train.csv')
+    
+ #   Pdb().set_trace()
     cls_counts = Counter(cls for cls in df["diagnosis"])
     
     fold_cls_counts = defaultdict(int)
     folds = [-1] * len(df)
+    
     for item in tqdm.tqdm(df.sample(frac=1, random_state=seed).itertuples(),
                       total=len(df)):
-    
+     #   Pdb().set_trace()
         cls = item.diagnosis
         fold_counts = [(f, fold_cls_counts[f, cls]) for f in range(n_folds)]
         min_count = min([count for _, count in fold_counts])
@@ -86,10 +127,13 @@ def make_folds(n_folds:int,seed:int=42) -> pd.DataFrame:
 #   from IPython.core.debugger import Pdb; Pdb().set_trace()
     df['fold'] = folds
     
+    if rmdup:
+        df = pd.concat([df,strmd5_train_leak])
+    
     return df
 
 
-# In[12]:
+# In[4]:
 
 
 def external_data() -> pd.DataFrame:
@@ -109,11 +153,10 @@ if __name__ == "__main__":
    # print(df.head())
 
 
-# In[4]:
+# In[12]:
 
 
 def main():
-    
     parser = argparse.ArgumentParser()
     parser.add_argument('--n-folds', type=int, default=4)
     
