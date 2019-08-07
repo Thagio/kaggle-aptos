@@ -286,10 +286,10 @@ def train(args, model: nn.Module, criterion, *, params,
         
     if best_model_path.exists() and finetuning:
         state = load_model(model,best_model_path)
-        #epoch = 1
-        #step = 0
-        epoch = state['epoch']
-        step = state['step']
+        epoch = 1
+        step = 0
+     #   epoch = state['epoch']
+     #   step = state['step']
         best_valid_loss = state['best_valid_loss']
     
     else:
